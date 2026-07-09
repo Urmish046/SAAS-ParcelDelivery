@@ -1,5 +1,5 @@
 import { IsEmail, IsNotEmpty, IsEnum, MinLength, IsOptional } from 'class-validator';
-import { UserRole } from '../models/user.model';
+import { UserRole } from '../../models/user.model';
 
 export class CreateUserDto {
   @IsEmail({}, { message: 'Invalid email format.' })

@@ -1,5 +1,5 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne } from 'typeorm';
-import { Company } from '../../company/models/company.model';
+import { Company } from './company.model';
 
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
