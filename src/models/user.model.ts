@@ -4,7 +4,8 @@ import { Company } from './company.model';
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
   COMPANY_ADMIN = 'company_admin',
-  STAFF = 'staff',
+  CHINA_STAFF = 'china_staff',
+  NIGERIA_STAFF = 'nigeria_staff',
 }
 
 @Entity('users')
@@ -18,7 +19,7 @@ export class User {
   @Column()
   password!: string; 
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.STAFF })
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.CHINA_STAFF })
   role!: UserRole;
 
   @ManyToOne(() => Company, (company) => company.id, { nullable: true, onDelete: 'CASCADE' })

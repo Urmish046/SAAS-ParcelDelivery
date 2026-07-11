@@ -10,6 +10,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { WarehouseModule } from './modules/warehouse/warehouse.module';
+import { CustomerModule } from './modules/customer/customer.module';
+import { ParcelModule } from './modules/parcel/parcel.module';
 
 @Module({
   imports: [
@@ -33,7 +35,9 @@ import { WarehouseModule } from './modules/warehouse/warehouse.module';
     CompanyModule,
     UsersModule,
     AuthModule,
-    WarehouseModule
+    WarehouseModule,
+    CustomerModule,
+    ParcelModule
   ],
   controllers: [AppController],
   providers: [

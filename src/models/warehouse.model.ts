@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Company } from './company.model';
+import { Parcel } from './parcel.model';
 
 @Entity('warehouses')
 export class Warehouse {
@@ -27,4 +28,7 @@ export class Warehouse {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @OneToMany(() => Parcel, (parcel) => parcel.warehouse)
+parcels!: Parcel[];
 }
