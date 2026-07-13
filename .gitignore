@@ -1,0 +1,10 @@
+# ===== Editor / IDE (root-level) =====
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===== OS files (root-level) =====
+.DS_Store
+Thumbs.db
+desktop.ini
