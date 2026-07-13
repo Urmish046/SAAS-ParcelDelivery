@@ -21,6 +21,8 @@ export class User {
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.CHINA_STAFF })
   role!: UserRole;
+  @Column({ nullable: true })
+  companyId!: string;
 
   @ManyToOne(() => Company, (company) => company.id, { nullable: true, onDelete: 'CASCADE' })
   company!: Company;
