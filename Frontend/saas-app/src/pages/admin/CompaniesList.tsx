@@ -12,13 +12,14 @@ const CompaniesList: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { companies, status, createStatus, error } = useSelector((state: RootState) => state.companies);
 
+  // Form states updated with country and subdomain (URL)
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: '', adminEmail: '', password: '' });
+  const [formData, setFormData] = useState({ name: '', adminEmail: '', password: '', country: '', subdomain: '' });
   const [showPassword, setShowPassword] = useState(false);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<any>(null);
-  const [editFormData, setEditFormData] = useState({ name: '', adminEmail: '' });
+  const [editFormData, setEditFormData] = useState({ name: '', adminEmail: '', country: '', subdomain: '' });
 
   useEffect(() => {
     if (status === 'idle') {
@@ -33,31 +34,32 @@ const CompaniesList: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const generatedSubdomain = formData.name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]/g, '-') 
-      .replace(/-+/g, '-')      
-      .replace(/^-|-$/g, '');     
+    // Agar user ne URL khud nahi diya, toh naam se generate karein
+    const finalSubdomain = formData.subdomain
+      ? formData.subdomain.toLowerCase().trim().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+      : formData.name.toLowerCase().trim().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 
-    
     const payload = {
       ...formData,
-      subdomain: generatedSubdomain,
+      subdomain: finalSubdomain,
     };
 
-  
     const resultAction = await dispatch(createCompany(payload as any));
 
     if (createCompany.fulfilled.match(resultAction)) {
       setIsModalOpen(false);
-      setFormData({ name: '', adminEmail: '', password: '' });
+      setFormData({ name: '', adminEmail: '', password: '', country: '', subdomain: '' });
     }
   };
 
   const handleEditClick = (company: any) => {
     setEditingCompany(company);
-    setEditFormData({ name: company.name, adminEmail: company.adminEmail });
+    setEditFormData({
+      name: company.name,
+      adminEmail: company.adminEmail,
+      country: company.country || '',
+      subdomain: company.subdomain || ''
+    });
     setIsEditModalOpen(true);
   };
 
@@ -68,7 +70,21 @@ const CompaniesList: React.FC = () => {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCompany) return;
-    await dispatch(updateCompany({ id: editingCompany.id, data: editFormData }));
+    
+    // Edit karte waqt bhi URL format theek rakhein
+    const formattedSubdomain = editFormData.subdomain
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    const payload = {
+      ...editFormData,
+      subdomain: formattedSubdomain,
+    };
+
+    await dispatch(updateCompany({ id: editingCompany.id, data: payload }));
     setIsEditModalOpen(false);
     setEditingCompany(null);
   };
@@ -108,6 +124,8 @@ const CompaniesList: React.FC = () => {
                 <tr>
                   <th className="px-6 py-4">Company Name</th>
                   <th className="px-6 py-4">Admin Email</th>
+                  <th className="px-6 py-4">Location</th>
+                  <th className="px-6 py-4">Portal URL</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
@@ -115,7 +133,7 @@ const CompaniesList: React.FC = () => {
               <tbody className="divide-y divide-gray-200">
                 {companies.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                       No companies found. Click "Add New Company" to get started.
                     </td>
                   </tr>
@@ -124,6 +142,8 @@ const CompaniesList: React.FC = () => {
                     <tr key={company.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 font-medium text-brand-900">{company.name}</td>
                       <td className="px-6 py-4">{company.adminEmail || 'N/A'}</td>
+                      <td className="px-6 py-4">{company.country || 'N/A'}</td>
+                      <td className="px-6 py-4 font-mono text-xs">{company.subdomain ? `${company.subdomain}.domain.com` : 'N/A'}</td>
                       <td className="px-6 py-4">
                         <span
                           className={`px-2.5 py-1 text-xs font-medium rounded-full ${
@@ -160,8 +180,8 @@ const CompaniesList: React.FC = () => {
 
       {/* Add Company Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md p-6 my-8 bg-white rounded-lg shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-brand-900">Add New Company</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
@@ -177,6 +197,26 @@ const CompaniesList: React.FC = () => {
                   value={formData.name} onChange={handleInputChange}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-500"
                   placeholder="e.g. FastCargo Logistics"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 text-xs font-medium text-gray-500 uppercase">Operating Country</label>
+                <input
+                  type="text" name="country" required
+                  value={formData.country} onChange={handleInputChange}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  placeholder="e.g. UAE, Pakistan, China"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 text-xs font-medium text-gray-500 uppercase">Portal URL (Subdomain)</label>
+                <input
+                  type="text" name="subdomain"
+                  value={formData.subdomain} onChange={handleInputChange}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  placeholder="Leave blank to auto-generate"
                 />
               </div>
 
@@ -207,12 +247,10 @@ const CompaniesList: React.FC = () => {
                     tabIndex={-1}
                   >
                     {showPassword ? (
-                      // Eye-off icon
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
                       </svg>
                     ) : (
-                      // Eye icon
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -241,8 +279,8 @@ const CompaniesList: React.FC = () => {
 
       {/* Edit Company Modal */}
       {isEditModalOpen && editingCompany && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md p-6 my-8 bg-white rounded-lg shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-brand-900">Edit Company</h3>
               <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-600">
@@ -259,6 +297,27 @@ const CompaniesList: React.FC = () => {
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-500"
                 />
               </div>
+
+              <div>
+                <label className="block mb-1 text-xs font-medium text-gray-500 uppercase">Operating Country</label>
+                <input
+                  type="text" name="country" required
+                  value={editFormData.country}
+                  onChange={handleEditInputChange}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 text-xs font-medium text-gray-500 uppercase">Portal URL (Subdomain)</label>
+                <input
+                  type="text" name="subdomain" required
+                  value={editFormData.subdomain}
+                  onChange={handleEditInputChange}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+              </div>
+
               <div>
                 <label className="block mb-1 text-xs font-medium text-gray-500 uppercase">Admin Email</label>
                 <input

@@ -23,50 +23,55 @@ export class UsersService {
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-    
+
     const resolvedCompanyId = currentUser.role === 'super_admin' ? createUserDto.companyId : currentUser.companyId;
+
+    if (createUserDto.role === 'warehouse_staff' && !createUserDto.warehouseId) {
+      throw new ConflictException('Warehouse ID is required when creating warehouse staff.');
+    }
 
     const newUser = this.userRepository.create({
       email: createUserDto.email,
       password: hashedPassword,
       role: createUserDto.role,
-      company: resolvedCompanyId ? { id: resolvedCompanyId } : undefined,
+      companyId: resolvedCompanyId,
+      warehouseId: createUserDto.role === 'warehouse_staff' ? createUserDto.warehouseId : undefined,
     });
 
     const savedUser = await this.userRepository.save(newUser);
-    const { password, ...result } = savedUser as any; 
-    return result; 
+    const { password, ...result } = savedUser as any;
+    return result;
   }
 
   async findByEmail(email: string) {
     return await this.userRepository.findOne({
       where: { email },
-      relations: ['company'],
+      relations: ['company', 'warehouse'],
     });
   }
 
   async findAll(user: any) {
     if (user.role === 'super_admin') {
-      return await this.userRepository.find({ relations: ['company'] });
+      return await this.userRepository.find({ relations: ['company', 'warehouse'] });
     }
-    
+
     return await this.userRepository.find({
-      where: { company: { id: user.companyId } },
-      relations: ['company'],
+      where: { companyId: user.companyId },
+      relations: ['company', 'warehouse'],
     });
   }
 
   async findOne(id: string, currentUser: any) {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['company'],
+      relations: ['company', 'warehouse'],
     });
 
     if (!user) {
       throw new NotFoundException(`User not found!`);
     }
 
-    if (currentUser.role !== 'super_admin' && user.company?.id !== currentUser.companyId) {
+    if (currentUser.role !== 'super_admin' && user.companyId !== currentUser.companyId) {
       throw new ForbiddenException('Access denied. You can only view users from your own company.');
     }
 

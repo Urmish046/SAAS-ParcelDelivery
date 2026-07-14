@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { logout } from '../../features/auth/authSlice';
 
@@ -15,7 +15,6 @@ const SuperAdminLayout: React.FC = () => {
   return (
     <div className="flex min-h-screen font-sans bg-brand-100 text-brand-900">
       
-      {/* Sidebar */}
       <aside className="flex flex-col w-64 text-white shadow-2xl bg-brand-900 shadow-brand-900/50">
         <div className="p-6 border-b border-brand-500/30">
           <h1 className="text-2xl font-extrabold tracking-widest uppercase">
@@ -25,12 +24,26 @@ const SuperAdminLayout: React.FC = () => {
         </div>
         
         <nav className="flex-1 p-4 space-y-2">
-          <Link to="/super-admin/dashboard" className="block px-4 py-3 text-sm font-bold tracking-wider text-white uppercase transition-colors bg-brand-500">
+          <NavLink 
+            to="/super-admin/dashboard" 
+            className={({ isActive }) => 
+              isActive 
+                ? "block px-4 py-3 text-sm font-bold tracking-wider text-white uppercase transition-colors bg-brand-500" 
+                : "block px-4 py-3 text-sm font-semibold tracking-wider uppercase transition-colors text-brand-300 hover:bg-brand-500/50 hover:text-white"
+            }
+          >
             Dashboard
-          </Link>
-          <Link to="/super-admin/companies" className="block px-4 py-3 text-sm font-semibold tracking-wider uppercase transition-colors text-brand-300 hover:bg-brand-500/50 hover:text-white">
+          </NavLink>
+          <NavLink 
+            to="/super-admin/companies" 
+            className={({ isActive }) => 
+              isActive 
+                ? "block px-4 py-3 text-sm font-bold tracking-wider text-white uppercase transition-colors bg-brand-500" 
+                : "block px-4 py-3 text-sm font-semibold tracking-wider uppercase transition-colors text-brand-300 hover:bg-brand-500/50 hover:text-white"
+            }
+          >
             Companies
-          </Link>
+          </NavLink>
         </nav>
         
         <div className="p-4 border-t border-brand-500/30">
@@ -43,10 +56,8 @@ const SuperAdminLayout: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex flex-col flex-1">
         
-        {/* Top Navbar */}
         <header className="flex justify-between items-center px-8 py-5 bg-white border-b shadow-sm border-brand-300">
           <h2 className="text-lg font-bold tracking-widest uppercase text-brand-900">
             Control Center

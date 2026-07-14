@@ -1,11 +1,11 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Company } from './company.model';
+import { Warehouse } from './warehouse.model';
 
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
   COMPANY_ADMIN = 'company_admin',
-  CHINA_STAFF = 'china_staff',
-  NIGERIA_STAFF = 'nigeria_staff',
+  WAREHOUSE_STAFF = 'warehouse_staff',
 }
 
 @Entity('users')
@@ -17,15 +17,24 @@ export class User {
   email!: string;
 
   @Column()
-  password!: string; 
+  password!: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.CHINA_STAFF })
+  @Column({ type: 'enum', enum: UserRole })
   role!: UserRole;
+
   @Column({ nullable: true })
   companyId!: string;
 
-  @ManyToOne(() => Company, (company) => company.id, { nullable: true, onDelete: 'CASCADE' })
+  @ManyToOne(() => Company, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'companyId' })
   company!: Company;
+
+  @Column({ nullable: true })
+  warehouseId!: string;
+
+  @ManyToOne(() => Warehouse, { nullable: true })
+  @JoinColumn({ name: 'warehouseId' })
+  warehouse!: Warehouse;
 
   @CreateDateColumn()
   createdAt!: Date;

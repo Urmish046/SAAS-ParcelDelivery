@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Company } from './company.model';
 import { Parcel } from './parcel.model';
+import { User } from './user.model';
 
 @Entity('warehouses')
 export class Warehouse {
@@ -11,7 +12,7 @@ export class Warehouse {
   name!: string;
 
   @Column()
-  city! : string;
+  city!: string;
 
   @Column({ type: 'text', nullable: true })
   address!: string;
@@ -30,5 +31,8 @@ export class Warehouse {
   updatedAt!: Date;
 
   @OneToMany(() => Parcel, (parcel) => parcel.warehouse)
-parcels!: Parcel[];
+  parcels!: Parcel[];
+
+  @OneToMany(() => User, (user) => user.warehouse)
+  staff!: User[];
 }

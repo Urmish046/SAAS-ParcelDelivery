@@ -14,12 +14,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    console.log("Token Payload: ", payload);
-    return { 
-      userId: payload.sub, 
-      email: payload.email, 
-      role: payload.role, 
-      companyId: payload.companyId 
+    return {
+      userId: payload.sub,
+      email: payload.email,
+      role: payload.role,
+      companyId: payload.companyId,
+      warehouseId: payload.warehouseId,
     };
   }
 }

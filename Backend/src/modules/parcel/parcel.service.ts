@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Parcel, ParcelStatus } from '../../models/parcel.model';
@@ -47,9 +47,16 @@ export class ParcelService {
 
   async findAll(companyId: string, currentUser: any) {
     const whereClause: any = { companyId };
-    
+
     if (currentUser.role === 'customer') {
       whereClause.customerId = currentUser.userId;
+    }
+
+    if (currentUser.role === 'warehouse_staff') {
+      if (!currentUser.warehouseId) {
+        throw new ForbiddenException('You are not assigned to any warehouse.');
+      }
+      whereClause.warehouseId = currentUser.warehouseId;
     }
 
     return this.parcelRepository.find({
@@ -60,9 +67,16 @@ export class ParcelService {
 
   async findOne(id: string, companyId: string, currentUser: any) {
     const whereClause: any = { id, companyId };
-    
+
     if (currentUser.role === 'customer') {
       whereClause.customerId = currentUser.userId;
+    }
+
+    if (currentUser.role === 'warehouse_staff') {
+      if (!currentUser.warehouseId) {
+        throw new ForbiddenException('You are not assigned to any warehouse.');
+      }
+      whereClause.warehouseId = currentUser.warehouseId;
     }
 
     const parcel = await this.parcelRepository.findOne({
@@ -85,7 +99,7 @@ export class ParcelService {
     }
 
     parcel.status = updateDto.status;
-    
+
     if (updateDto.customerTrackingId) {
       parcel.customerTrackingId = updateDto.customerTrackingId;
     }

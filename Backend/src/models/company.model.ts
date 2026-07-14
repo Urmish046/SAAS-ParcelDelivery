@@ -15,6 +15,9 @@ export class Company {
   @Column({ unique: true })
   subdomain!: string; 
 
+  @Column({ nullable: true })
+  country!: string;
+
   @Column({ default: 'ACTIVE' })
   status!: string; 
 
@@ -28,11 +31,11 @@ export class Company {
   users!: User[];
 
   @OneToMany(() => Warehouse, (warehouse) => warehouse.company)
-warehouses!: Warehouse[];
+  warehouses!: Warehouse[];
 
-@OneToMany(() => Customer, (customer) => customer.company)
-customers!: Customer[];
+  @OneToMany(() => Customer, (customer) => customer.company)
+  customers!: Customer[];
 
-@OneToMany(() => Parcel, (parcel) => parcel.company)
-parcels!: Parcel[];
+  @OneToMany(() => Parcel, (parcel) => parcel.company)
+  parcels!: Parcel[];
 }

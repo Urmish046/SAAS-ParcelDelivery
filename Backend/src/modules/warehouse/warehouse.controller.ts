@@ -16,14 +16,13 @@ export class WarehouseController {
   }
 
   @Get()
-  @Roles('company_admin', 'china_staff', 'nigeria_staff')
+  @Roles('company_admin', 'warehouse_staff')
   findAll(@CurrentUser() user: any) {
     return this.warehouseService.findAll(user.companyId);
-    
   }
 
   @Get(':id')
-  @Roles('company_admin', 'china_staff', 'nigeria_staff')
+  @Roles('company_admin', 'warehouse_staff')
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
     return this.warehouseService.findOne(id, user.companyId);
   }
@@ -31,8 +30,8 @@ export class WarehouseController {
   @Patch(':id')
   @Roles('company_admin')
   update(
-    @Param('id') id: string, 
-    @Body() updateWarehouseDto: UpdateWarehouseDto, 
+    @Param('id') id: string,
+    @Body() updateWarehouseDto: UpdateWarehouseDto,
     @CurrentUser() user: any
   ) {
     return this.warehouseService.update(id, updateWarehouseDto, user.companyId);

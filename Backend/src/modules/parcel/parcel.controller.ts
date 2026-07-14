@@ -10,25 +10,25 @@ export class ParcelController {
   constructor(private readonly parcelService: ParcelService) {}
 
   @Post()
-  @Roles('company_admin', 'china_staff', 'nigeria_staff', 'customer')
+  @Roles('company_admin', 'warehouse_staff', 'customer')
   create(@Body() createParcelDto: CreateParcelDto, @CurrentUser() user: any) {
     return this.parcelService.create(createParcelDto, user.companyId, user);
   }
 
   @Get()
-  @Roles('company_admin', 'china_staff', 'nigeria_staff', 'customer')
+  @Roles('company_admin', 'warehouse_staff', 'customer')
   findAll(@CurrentUser() user: any) {
     return this.parcelService.findAll(user.companyId, user);
   }
 
   @Get(':id')
-  @Roles('company_admin', 'china_staff', 'nigeria_staff', 'customer')
+  @Roles('company_admin', 'warehouse_staff', 'customer')
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
     return this.parcelService.findOne(id, user.companyId, user);
   }
 
   @Patch(':id/status')
-  @Roles('company_admin', 'china_staff', 'nigeria_staff')
+  @Roles('company_admin', 'warehouse_staff')
   updateStatus(
     @Param('id') id: string,
     @Body() updateParcelStatusDto: UpdateParcelStatusDto,
@@ -37,7 +37,7 @@ export class ParcelController {
     return this.parcelService.updateStatus(id, updateParcelStatusDto, user.companyId, user);
   }
 
- @Delete(':id')
+  @Delete(':id')
   @Roles('company_admin')
   remove(@Param('id') id: string, @CurrentUser() user: any) {
     return this.parcelService.remove(id, user.companyId, user);

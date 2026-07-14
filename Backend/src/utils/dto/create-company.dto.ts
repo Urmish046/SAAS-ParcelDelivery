@@ -13,6 +13,10 @@ export class CreateCompanyDto {
   })
   subdomain!: string;
 
+  @IsString()
+  @IsNotEmpty({ message: 'Operating country is required.' })
+  country!: string;
+
   @IsEmail({}, { message: 'Please provide a valid admin email address.' })
   @IsNotEmpty({ message: 'Admin email is required.' })
   adminEmail!: string;

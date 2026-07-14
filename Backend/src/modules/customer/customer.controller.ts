@@ -10,28 +10,28 @@ export class CustomerController {
   constructor(private readonly customerService: CustomerService) {}
 
   @Post()
-  @Roles('company_admin', 'china_staff', 'nigeria_staff')
+  @Roles('company_admin', 'warehouse_staff')
   create(@Body() createCustomerDto: CreateCustomerDto, @CurrentUser() user: any) {
     return this.customerService.create(createCustomerDto, user.companyId);
   }
 
   @Get()
-  @Roles('company_admin', 'china_staff', 'nigeria_staff')
+  @Roles('company_admin', 'warehouse_staff')
   findAll(@CurrentUser() user: any) {
     return this.customerService.findAll(user.companyId);
   }
 
   @Get(':id')
-  @Roles('company_admin', 'china_staff', 'nigeria_staff')
+  @Roles('company_admin', 'warehouse_staff')
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
     return this.customerService.findOne(id, user.companyId);
   }
 
   @Patch(':id')
-  @Roles('company_admin', 'china_staff', 'nigeria_staff')
+  @Roles('company_admin', 'warehouse_staff')
   update(
-    @Param('id') id: string, 
-    @Body() updateCustomerDto: UpdateCustomerDto, 
+    @Param('id') id: string,
+    @Body() updateCustomerDto: UpdateCustomerDto,
     @CurrentUser() user: any
   ) {
     return this.customerService.update(id, updateCustomerDto, user.companyId);

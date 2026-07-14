@@ -18,7 +18,6 @@ export class AuthService {
 
   async login(email: string, pass: string) {
     const user = await this.usersService.findByEmail(email);
-    console.log("User Data Found:", user); // Yeh line add karein
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
     }
@@ -28,11 +27,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const payload = { 
-        sub: user.id, 
-        email: user.email, 
-        role: user.role, 
-        companyId: user.company?.id 
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      companyId: user.companyId,
+      warehouseId: user.warehouseId,
     };
 
     return {
@@ -67,7 +67,7 @@ export class AuthService {
       access_token: this.jwtService.sign(payload),
     };
   }
-  
+
   async customerRegister(createCustomerDto: CreateCustomerDto, companyId: string) {
     const existingCustomer = await this.customerRepository.findOne({
       where: { email: createCustomerDto.email, companyId },

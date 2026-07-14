@@ -23,6 +23,7 @@ export class CompanyService {
       const newCompany = queryRunner.manager.create(Company, {
         name: createCompanyDto.name,
         subdomain: createCompanyDto.subdomain,
+        country: createCompanyDto.country,
         status: 'ACTIVE',
       });
       const savedCompany = await queryRunner.manager.save(newCompany);
