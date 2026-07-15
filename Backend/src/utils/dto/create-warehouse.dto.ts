@@ -7,7 +7,7 @@ export class CreateWarehouseDto {
 
   @IsString()
   @IsNotEmpty()
-  city!: string;
+  location!: string;
 
   @IsString()
   @IsOptional()

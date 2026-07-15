@@ -3,6 +3,7 @@ import { CompanyService } from './company.service';
 import { CreateCompanyDto } from '../../utils/dto/create-company.dto';
 import { Roles } from '../../decorators/roles.decorator';
 import { CurrentUser } from '../../decorators/current-user.decorator';
+import { Public } from '../../decorators/public.decorator';
 
 @Controller('company')
 export class CompanyController {
@@ -14,11 +15,17 @@ export class CompanyController {
     return this.companyService.create(createCompanyDto);
   }
 
+  @Public()
+  @Get('by-subdomain/:subdomain')
+  findBySubdomain(@Param('subdomain') subdomain: string) {
+  return this.companyService.findBySubdomain(subdomain);
+  }
+
   @Get()
   findAll(@CurrentUser() user: any) {
     return this.companyService.findAll(user);
   }
-
+ 
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
     return this.companyService.findOne(id, user);

@@ -7,7 +7,7 @@ export class UpdateWarehouseDto {
 
   @IsString()
   @IsOptional()
-  city?: string;
+  location?: string;
 
   @IsString()
   @IsOptional()

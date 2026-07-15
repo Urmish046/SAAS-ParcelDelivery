@@ -7,12 +7,13 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { UsersModule } from '../users/users.module';
-import { Customer } from 'src/models/customer.model';
+import { Customer } from '../../models/customer.model';
+import {Company} from "../../models/company.model";
 
 @Module({
   imports: [
     UsersModule,
-    TypeOrmModule.forFeature([Customer]),
+    TypeOrmModule.forFeature([Customer, Company]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

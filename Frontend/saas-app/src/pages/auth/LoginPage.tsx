@@ -1,32 +1,31 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { customerLogin } from '../../features/auth/authSlice';
+import { useNavigate } from 'react-router-dom'; // <-- 1. Yeh import kiya
+import { adminLogin } from '../../features/auth/authSlice';
 import type { AppDispatch, RootState } from '../../store/store';
-import { useNavigate } from 'react-router-dom';
 
 const LoginPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // <-- 2. Navigate hook initialize kiya
   const { status, error } = useSelector((state: RootState) => state.auth);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
-  const companyId = "4695ecc7-0d26-4555-afdc-2792ba6c42e8";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const resultAction = await dispatch(customerLogin({ email, password, companyId }));
+    const resultAction = await dispatch(adminLogin({ email, password }));
     
-    if (customerLogin.fulfilled.match(resultAction)) {
-      navigate('/dashboard');
+    // 3. Agar login successful ho gaya, toh sidha dashboard par bhejo!
+    if (adminLogin.fulfilled.match(resultAction)) {
+      navigate('/dashboard'); 
     }
   };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-brand-100">
       <div className="w-full max-w-md p-8 bg-white rounded-none shadow-xl shadow-brand-300/30 border border-brand-300/50">
-        <h2 className="mb-6 text-2xl font-bold text-center tracking-wide text-brand-900 uppercase">Customer Portal</h2>
+        <h2 className="mb-6 text-2xl font-bold text-center tracking-wide text-brand-900 uppercase">Admin Portal</h2>
         
         {error && (
           <div className="p-3 mb-4 text-sm text-white bg-red-500 rounded-none">

@@ -4,8 +4,9 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { Customer } from 'src/models/customer.model';
-import { CreateCustomerDto } from 'src/utils/dto/create-customer.dto';
+import { Customer } from '../../models/customer.model';
+import { CreateCustomerDto } from '../../utils/dto/create-customer.dto';
+import { Company } from '../../models/company.model';
 
 @Injectable()
 export class AuthService {
@@ -13,11 +14,14 @@ export class AuthService {
     private usersService: UsersService,
     @InjectRepository(Customer)
     private customerRepository: Repository<Customer>,
+    @InjectRepository(Company)
+    private companyRepository: Repository<Company>,
     private jwtService: JwtService,
   ) {}
 
   async login(email: string, pass: string) {
     const user = await this.usersService.findByEmail(email);
+
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
     }
@@ -25,6 +29,16 @@ export class AuthService {
     const isPasswordMatching = await bcrypt.compare(pass, user.password);
     if (!isPasswordMatching) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+         
+    let subdomain;
+
+    if(user.companyId){
+      const company = await this.companyRepository.findOne({ where: { id: user.companyId } });
+      if (!company) {
+        throw new UnauthorizedException('Company not found for this user');
+      }
+      subdomain = company.subdomain;
     }
 
     const payload = {
@@ -38,6 +52,7 @@ export class AuthService {
     return {
       message: 'Login successful!',
       access_token: this.jwtService.sign(payload),
+      subdomain: subdomain,
     };
   }
 

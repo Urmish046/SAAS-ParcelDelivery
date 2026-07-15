@@ -5,7 +5,6 @@ const LandingPage: React.FC = () => {
   return (
     <div className="min-h-screen font-sans bg-brand-100 text-brand-900">
       
-      {/* Navbar */}
       <nav className="flex items-center justify-between px-8 py-5 bg-white border-b border-brand-300">
         <div className="text-2xl font-bold tracking-widest uppercase">
           Parcel<span className="text-brand-500">Flow</span>
@@ -14,17 +13,15 @@ const LandingPage: React.FC = () => {
           <a href="#about" className="text-xs font-semibold tracking-widest uppercase transition-colors hover:text-brand-500">
             About Us
           </a>
-          {/* Navbar Login Button */}
           <Link 
             to="/login" 
             className="px-6 py-2.5 text-xs font-bold tracking-widest text-white uppercase transition-colors bg-brand-900 rounded-none hover:bg-brand-500"
           >
-            Portal Login
+            Company Admin Login
           </Link>
         </div>
       </nav>
 
-      {/* Hero Section */}
       <section className="px-6 mx-auto mt-24 text-center max-w-5xl">
         <h1 className="mb-8 text-5xl font-extrabold leading-tight tracking-wider uppercase text-brand-900">
           Seamless Forwarding from <br/> <span className="text-brand-500">China to Nigeria</span>
@@ -36,11 +33,10 @@ const LandingPage: React.FC = () => {
           to="/login" 
           className="px-8 py-4 text-sm font-bold tracking-widest text-white uppercase transition-colors shadow-lg bg-brand-500 shadow-brand-300/50 hover:bg-brand-900"
         >
-          Get Started Now
+          Access Admin Portal
         </Link>
       </section>
 
-      {/* About Section */}
       <section id="about" className="py-24 mt-32 bg-white border-t border-brand-300">
         <div className="px-6 mx-auto text-center max-w-4xl">
           <h2 className="mb-8 text-3xl font-bold tracking-widest uppercase text-brand-900">
@@ -53,7 +49,6 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="py-8 text-center text-white bg-brand-900">
         <p className="text-xs tracking-widest uppercase text-brand-300">
           &copy; {new Date().getFullYear()} ParcelFlow SaaS. All rights reserved.

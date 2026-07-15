@@ -12,7 +12,7 @@ export class Warehouse {
   name!: string;
 
   @Column()
-  city!: string;
+  location!: string;
 
   @Column({ type: 'text', nullable: true })
   address!: string;

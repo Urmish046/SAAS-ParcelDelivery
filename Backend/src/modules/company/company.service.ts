@@ -4,7 +4,7 @@ import { Repository, DataSource, In } from 'typeorm';
 import { Company } from '../../models/company.model';
 import { User, UserRole } from '../../models/user.model'; 
 import * as bcrypt from 'bcrypt';
-import { CreateCompanyDto } from 'src/utils/dto/create-company.dto';
+import { CreateCompanyDto } from '../../utils/dto/create-company.dto';
 
 @Injectable()
 export class CompanyService {
@@ -13,6 +13,21 @@ export class CompanyService {
     private companyRepository: Repository<Company>,
     private dataSource: DataSource,
   ) {}
+
+  async findBySubdomain(subdomain: string) {
+    const company = await this.companyRepository.findOne({
+      where: { subdomain },
+    });
+    if(!company){
+      throw new NotFoundException(`Company with subdomain ${subdomain} not found!`);
+    }
+    return{
+      companyId: company.id,
+      name: company.name,
+      subdomain: company.subdomain,
+      country: company.country
+    }
+  }
 
   async create(createCompanyDto: CreateCompanyDto) {
     const queryRunner = this.dataSource.createQueryRunner();
@@ -57,7 +72,9 @@ export class CompanyService {
   async findAll(user: any) {
     let companies;
     
-    if (user.role === 'super_admin') {
+    const isSuperAdmin = user.role === UserRole.SUPER_ADMIN || user.role?.toLowerCase() === 'super_admin';
+
+    if (isSuperAdmin) {
       companies = await this.companyRepository.find();
     } else {
       companies = await this.companyRepository.find({
@@ -90,7 +107,9 @@ export class CompanyService {
       throw new NotFoundException(`Company with ID ${id} not found in database!`);
     }
     
-    if (user.role !== 'super_admin' && company.id !== user.companyId) {
+    const isSuperAdmin = user.role === UserRole.SUPER_ADMIN || user.role?.toLowerCase() === 'super_admin';
+
+    if (!isSuperAdmin && company.id !== user.companyId) {
       throw new ForbiddenException('Access denied. You can only view your own company data.');
     }
     
