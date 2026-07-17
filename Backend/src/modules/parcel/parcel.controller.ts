@@ -37,6 +37,12 @@ export class ParcelController {
     return this.parcelService.updateStatus(id, updateParcelStatusDto, user.companyId, user);
   }
 
+  @Patch(':id/confirm')
+  @Roles('customer')
+  confirmShipment(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.parcelService.confirmShipment(id, user.companyId, user);
+  }
+
   @Delete(':id')
   @Roles('company_admin')
   remove(@Param('id') id: string, @CurrentUser() user: any) {

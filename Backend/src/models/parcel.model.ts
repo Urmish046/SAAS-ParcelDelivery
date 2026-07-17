@@ -5,13 +5,16 @@ import { Customer } from './customer.model';
 
 export enum ParcelStatus {
   PENDING = 'pending',
-  RECEIVED_CHINA = 'received_china',
+  RECEIVED_AT_ORIGIN = 'received_at_origin', 
+  SCANNED = 'scanned',
+  AWAITING_CONFIRMATION = 'awaiting_confirmation',
   CONFIRMED_BY_CUSTOMER = 'confirmed_by_customer',
   SHIPPED = 'shipped',
-  RECEIVED_NIGERIA = 'received_nigeria',
+  RECEIVED_AT_DESTINATION = 'received_at_destination', 
+  AVAILABLE_FOR_PICKUP = 'available_for_pickup',
   PAID = 'paid',
   COMPLETED = 'completed',
-  RETURNED = 'returned',
+  RETURNED = 'returned'
 }
 
 @Entity('parcels')
@@ -70,4 +73,6 @@ export class Parcel {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  
 }

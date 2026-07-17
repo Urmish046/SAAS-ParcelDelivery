@@ -1,13 +1,23 @@
-import { IsEnum, IsNotEmpty, IsString, ValidateIf } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsNumber } from 'class-validator';
 import { ParcelStatus } from '../../models/parcel.model';
 
 export class UpdateParcelStatusDto {
   @IsEnum(ParcelStatus)
-  @IsNotEmpty()
   status!: ParcelStatus;
 
-  @ValidateIf(o => o.status === ParcelStatus.SHIPPED)
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Customer tracking ID is required when shipping a parcel.' })
   customerTrackingId?: string;
+
+  @IsOptional()
+  @IsNumber()
+  weight?: number;
+
+  @IsOptional()
+  @IsString()
+  dimensions?: string;
+
+  @IsOptional()
+  @IsNumber()
+  shippingCost?: number;
 }

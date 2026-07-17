@@ -37,7 +37,8 @@ import { ParcelModule } from './modules/parcel/parcel.module';
     AuthModule,
     WarehouseModule,
     CustomerModule,
-    ParcelModule
+    ParcelModule,
+
   ],
   controllers: [AppController],
   providers: [

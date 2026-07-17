@@ -9,6 +9,9 @@ import CompaniesList from '../pages/admin/CompaniesList';
 import CompanyAdminLayout from '../components/layout/CompanyAdminLayout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import WarehousesManagement from '../pages/admin/WarehousesManagement';
+import StaffManagement from '../pages/admin/StaffManagement';
+import CustomersManagement from '../pages/admin/CustomersManagement';
+import ParcelsManagement from '../pages/admin/ParcelsManagement';
 
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center min-h-[60vh] bg-transparent">
@@ -23,7 +26,6 @@ const AppRoutes: React.FC = () => {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        
         <Route path="/login" element={<LoginPage />} />
         <Route path="/admin/login" element={<SuperAdminLoginPage />} />
         
@@ -35,11 +37,11 @@ const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         >
-          <Route index element={<PlaceholderPage title="Company Dashboard Overview" />} />
+          <Route index element={< DashboardOverview />} />
           <Route path="warehouses" element={<WarehousesManagement />} />
-          <Route path="staff" element={<PlaceholderPage title="Staff Management" />} />
-          <Route path="customers" element={<PlaceholderPage title="Customers Management" />} />
-          <Route path="parcels" element={<PlaceholderPage title="Parcels Management" />} />
+          <Route path="staff" element={<StaffManagement />} />
+          <Route path="customers" element={<CustomersManagement />} />          
+          <Route path="parcels" element={<ParcelsManagement />} />
         </Route>
         
         <Route 

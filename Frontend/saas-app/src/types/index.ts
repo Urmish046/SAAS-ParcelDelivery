@@ -1,7 +1,7 @@
 export interface User {
   id: string;
   email: string;
-  role: 'super_admin' | 'company_admin' | 'china_staff' | 'nigeria_staff' | 'customer';
+  role: 'super_admin' | 'company_admin' | 'warehouse_staff' | 'customer';
   companyId?: string;
 }
 
