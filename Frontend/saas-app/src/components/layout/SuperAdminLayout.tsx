@@ -9,8 +9,7 @@ const SuperAdminLayout: React.FC = () => {
 
   const handleLogout = () => {
     dispatch(logout());
-    navigate('/admin/login');
-  };
+navigate('/super-admin/login');  };
 
   return (
     <div className="flex min-h-screen font-sans bg-brand-100 text-brand-900">

@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Parcel, ParcelStatus } from '../../models/parcel.model';
 import { ParcelStatusHistory } from '../../models/parcel-status-history.model';
 import { CreateParcelDto } from '../../utils/dto/create-parcel.dto';
 import { UpdateParcelStatusDto } from '../../utils/dto/update-parcel-status.dto';
+import { STORAGE_SERVICE, type IStorageService } from '../../storage/storage.interface';
 
 @Injectable()
 export class ParcelService {
@@ -13,6 +14,8 @@ export class ParcelService {
     private parcelRepository: Repository<Parcel>,
     @InjectRepository(ParcelStatusHistory)
     private historyRepository: Repository<ParcelStatusHistory>,
+    @Inject(STORAGE_SERVICE)
+    private readonly storageService: IStorageService,
   ) {}
 
   async create(createParcelDto: CreateParcelDto, companyId: string, currentUser: any) {
@@ -94,22 +97,14 @@ export class ParcelService {
   async updateStatus(id: string, updateDto: UpdateParcelStatusDto, companyId: string, currentUser: any) {
     const parcel = await this.findOne(id, companyId, currentUser);
 
-    if (updateDto.status === ParcelStatus.CONFIRMED_BY_CUSTOMER) {
-      throw new ForbiddenException('Manual confirmation by staff is not allowed. Only customers can confirm this stage.');
-    }
-
+    // Simplified logic for our 6 new statuses
     const allowedNextStatuses = {
-      [ParcelStatus.PENDING]: [ParcelStatus.RECEIVED_AT_ORIGIN, ParcelStatus.RETURNED],
-      [ParcelStatus.RECEIVED_AT_ORIGIN]: [ParcelStatus.SCANNED, ParcelStatus.RETURNED],
-      [ParcelStatus.SCANNED]: [ParcelStatus.AWAITING_CONFIRMATION, ParcelStatus.RETURNED],
-      [ParcelStatus.AWAITING_CONFIRMATION]: [ParcelStatus.RETURNED], 
-      [ParcelStatus.CONFIRMED_BY_CUSTOMER]: [ParcelStatus.SHIPPED, ParcelStatus.RETURNED],
-      [ParcelStatus.SHIPPED]: [ParcelStatus.RECEIVED_AT_DESTINATION, ParcelStatus.RETURNED],
-      [ParcelStatus.RECEIVED_AT_DESTINATION]: [ParcelStatus.AVAILABLE_FOR_PICKUP, ParcelStatus.RETURNED],
-      [ParcelStatus.AVAILABLE_FOR_PICKUP]: [ParcelStatus.PAID, ParcelStatus.RETURNED],
-      [ParcelStatus.PAID]: [ParcelStatus.COMPLETED],
+      [ParcelStatus.PENDING]: [ParcelStatus.SCANNED, ParcelStatus.RETURNED],
+      [ParcelStatus.SCANNED]: [ParcelStatus.SHIPPED, ParcelStatus.RETURNED],
+      [ParcelStatus.SHIPPED]: [ParcelStatus.AVAILABLE_FOR_PICKUP, ParcelStatus.RETURNED],
+      [ParcelStatus.AVAILABLE_FOR_PICKUP]: [ParcelStatus.COMPLETED, ParcelStatus.RETURNED],
       [ParcelStatus.COMPLETED]: [], 
-      [ParcelStatus.RETURNED]: [ParcelStatus.PENDING]
+      [ParcelStatus.RETURNED]: [ParcelStatus.PENDING] // Allowed to retry if returned
     };
 
     const validTransitions = allowedNextStatuses[parcel.status as string] || [];
@@ -141,27 +136,22 @@ export class ParcelService {
 
     return parcel;
   }
-  // 4. NEW METHOD: For Customer Confirmation Endpoint
-  async confirmShipment(id: string, companyId: string, currentUser: any) {
+
+  async uploadImage(id: string, file: Express.Multer.File, companyId: string, currentUser: any): Promise<string> {
     const parcel = await this.findOne(id, companyId, currentUser);
+    
+    const fileName = await this.storageService.uploadFile(file, `parcels/${companyId}`);
 
-    if (parcel.status !== ParcelStatus.AWAITING_CONFIRMATION) {
-      throw new BadRequestException('Parcel cannot be confirmed at this stage.');
+    try {
+      const currentImages = parcel.imageUrls || [];
+      parcel.imageUrls = [...currentImages, fileName];
+      await this.parcelRepository.save(parcel);
+      
+      return fileName;
+    } catch (error) {
+      await this.storageService.deleteFile(fileName);
+      throw new InternalServerErrorException('Database update failed');
     }
-
-    parcel.status = ParcelStatus.CONFIRMED_BY_CUSTOMER;
-    await this.parcelRepository.save(parcel);
-
-    await this.historyRepository.save(
-      this.historyRepository.create({
-        parcelId: parcel.id,
-        status: ParcelStatus.CONFIRMED_BY_CUSTOMER,
-        changedById: currentUser.userId,
-        changedByType: 'customer',
-      })
-    );
-
-    return parcel;
   }
 
   async remove(id: string, companyId: string, currentUser: any) {

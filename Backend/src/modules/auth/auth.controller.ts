@@ -14,6 +14,12 @@ export class AuthController {
   }
 
   @Public()
+  @Post('super-admin/login')
+  superAdminLogin(@Body() body: any) {
+    return this.authService.superAdminLogin(body.email, body.password);
+  }
+
+  @Public()
   @Post('customer-login')
   customerLogin(@Body() body: any) {
     return this.authService.customerLogin(body.email, body.password, body.companyId);

@@ -5,16 +5,11 @@ import { Customer } from './customer.model';
 
 export enum ParcelStatus {
   PENDING = 'pending',
-  RECEIVED_AT_ORIGIN = 'received_at_origin', 
   SCANNED = 'scanned',
-  AWAITING_CONFIRMATION = 'awaiting_confirmation',
-  CONFIRMED_BY_CUSTOMER = 'confirmed_by_customer',
   SHIPPED = 'shipped',
-  RECEIVED_AT_DESTINATION = 'received_at_destination', 
   AVAILABLE_FOR_PICKUP = 'available_for_pickup',
-  PAID = 'paid',
   COMPLETED = 'completed',
-  RETURNED = 'returned'
+  RETURNED = 'returned',
 }
 
 @Entity('parcels')
@@ -34,6 +29,9 @@ export class Parcel {
 
   @Column()
   description!: string;
+
+  @Column('text', { array: true, nullable: true })
+  imageUrls!: string[];
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   weight!: number;

@@ -22,7 +22,7 @@ export class AuthService {
   async login(email: string, pass: string) {
     const user = await this.usersService.findByEmail(email);
 
-    if (!user) {
+    if (!user || user.role === 'super_admin') {
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -30,7 +30,7 @@ export class AuthService {
     if (!isPasswordMatching) {
       throw new UnauthorizedException('Invalid email or password');
     }
-         
+          
     let subdomain;
 
     if(user.companyId){
@@ -53,6 +53,42 @@ export class AuthService {
       message: 'Login successful!',
       access_token: this.jwtService.sign(payload),
       subdomain: subdomain,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        companyId: user.companyId,
+        warehouseId: user.warehouseId,
+      }
+    };
+  }
+
+  async superAdminLogin(email: string, pass: string) {
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user || user.role !== 'super_admin') {
+      throw new UnauthorizedException('Access denied');
+    }
+
+    const isPasswordMatching = await bcrypt.compare(pass, user.password);
+    if (!isPasswordMatching) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    return {
+      message: 'Super Admin login successful!',
+      access_token: this.jwtService.sign(payload),
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      }
     };
   }
 
@@ -80,6 +116,12 @@ export class AuthService {
     return {
       message: 'Customer login successful!',
       access_token: this.jwtService.sign(payload),
+      user: {
+        id: customer.id,
+        email: customer.email,
+        role: 'customer',
+        companyId: customer.companyId,
+      }
     };
   }
 
@@ -112,6 +154,12 @@ export class AuthService {
     return {
       message: 'Customer registration successful!',
       access_token: this.jwtService.sign(payload),
+      user: {
+        id: savedCustomer.id,
+        email: savedCustomer.email,
+        role: 'customer',
+        companyId: savedCustomer.companyId,
+      }
     };
   }
 }

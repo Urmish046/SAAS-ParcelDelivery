@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { adminLogin } from '../../features/auth/authSlice';
+import { superAdminLogin } from '../../features/auth/authSlice';
 import type { AppDispatch, RootState } from '../../store/store';
 import { useNavigate } from 'react-router-dom';
 
@@ -14,9 +14,9 @@ const SuperAdminLoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const resultAction = await dispatch(adminLogin({ email, password }));
+    const resultAction = await dispatch(superAdminLogin({ email, password }));
     
-    if (adminLogin.fulfilled.match(resultAction)) {
+    if (superAdminLogin.fulfilled.match(resultAction)) {
       navigate('/super-admin/dashboard');
     }
   };

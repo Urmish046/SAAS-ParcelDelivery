@@ -12,47 +12,44 @@ import WarehousesManagement from '../pages/admin/WarehousesManagement';
 import StaffManagement from '../pages/admin/StaffManagement';
 import CustomersManagement from '../pages/admin/CustomersManagement';
 import ParcelsManagement from '../pages/admin/ParcelsManagement';
+import SuperAdminDashboard from '../pages/super-admin/SuperAdminDashboard';
 
-const PlaceholderPage = ({ title }: { title: string }) => (
-  <div className="flex items-center justify-center min-h-[60vh] bg-transparent">
-    <div className="p-10 text-xl font-bold tracking-widest text-center uppercase bg-white border-t-4 shadow-xl text-brand-900 shadow-brand-300/30 border-t-brand-500">
-      {title}
-    </div>
-  </div>
-);
 
 const AppRoutes: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/admin/login" element={<SuperAdminLoginPage />} />
         
         <Route 
           path="/dashboard" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['company_admin', 'warehouse_staff']} redirectPath="/login">
               <CompanyAdminLayout />
             </ProtectedRoute>
           }
         >
-          <Route index element={< DashboardOverview />} />
+          <Route index element={<DashboardOverview />} />
           <Route path="warehouses" element={<WarehousesManagement />} />
           <Route path="staff" element={<StaffManagement />} />
           <Route path="customers" element={<CustomersManagement />} />          
           <Route path="parcels" element={<ParcelsManagement />} />
         </Route>
         
+        <Route path="/super-admin/login" element={<SuperAdminLoginPage />} />
+        
         <Route 
+          path="/super-admin" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['super_admin']} redirectPath="/super-admin/login">
               <SuperAdminLayout />
             </ProtectedRoute>
           }
         >
-          <Route path="/super-admin/dashboard" element={<DashboardOverview />} />
-          <Route path="/super-admin/companies" element={<CompaniesList />} />
+          <Route path="dashboard" element={<SuperAdminDashboard />} />
+          <Route path="companies" element={<CompaniesList />} />
         </Route>
         
         <Route path="*" element={

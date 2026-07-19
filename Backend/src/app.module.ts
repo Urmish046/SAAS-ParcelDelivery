@@ -12,6 +12,8 @@ import { RolesGuard } from './guards/roles.guard';
 import { WarehouseModule } from './modules/warehouse/warehouse.module';
 import { CustomerModule } from './modules/customer/customer.module';
 import { ParcelModule } from './modules/parcel/parcel.module';
+import { StatsModule } from './stats/stats.module';
+
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { ParcelModule } from './modules/parcel/parcel.module';
     WarehouseModule,
     CustomerModule,
     ParcelModule,
+    StatsModule,
+
 
   ],
   controllers: [AppController],

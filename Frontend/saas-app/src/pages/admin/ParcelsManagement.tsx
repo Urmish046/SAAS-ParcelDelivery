@@ -6,16 +6,11 @@ import { fetchWarehouses } from '../../features/warehouses/warehousesSlice';
 import type { AppDispatch, RootState } from '../../store/store';
 
 const PARCEL_STATUSES = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'received_at_origin', label: 'Received at Origin' },
-  { value: 'scanned', label: 'Scanned' },
-  { value: 'awaiting_confirmation', label: 'Awaiting Customer Confirmation' },
-  { value: 'confirmed_by_customer', label: 'Confirmed by Customer' },
+  { value: 'pending', label: 'Pending (Not Arrived)' },
+  { value: 'scanned', label: 'Received & Scanned' },
   { value: 'shipped', label: 'Shipped to Destination' },
-  { value: 'received_at_destination', label: 'Received at Destination' },
-  { value: 'available_for_pickup', label: 'Available for Pickup' },
-  { value: 'paid', label: 'Paid' },
-  { value: 'completed', label: 'Completed' },
+  { value: 'available_for_pickup', label: 'Ready for Pickup' },
+  { value: 'completed', label: 'Completed / Delivered' },
   { value: 'returned', label: 'Returned' }
 ];
 
@@ -39,6 +34,7 @@ const ParcelsManagement: React.FC = () => {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState<any>(null);
 
   const [originalTrackingNumber, setOriginalTrackingNumber] = useState('');
@@ -52,6 +48,9 @@ const ParcelsManagement: React.FC = () => {
   
   const [updateWeight, setUpdateWeight] = useState('');
   const [updateShippingCost, setUpdateShippingCost] = useState('');
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (status === 'idle') dispatch(fetchParcels());
@@ -115,6 +114,44 @@ const ParcelsManagement: React.FC = () => {
   const handleDelete = (id: string) => {
     if (window.confirm('Are you sure you want to delete this parcel?')) {
       dispatch(deleteParcel(id));
+    }
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setImageFile(e.target.files[0]);
+    }
+  };
+
+  const handleImageUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedParcel || !imageFile) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('image', imageFile);
+
+    try {
+      const response = await fetch(`http://localhost:3000/parcels/${selectedParcel.id}/upload-image`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: formData,
+      });
+
+      if (response.ok) {
+        setIsImageModalOpen(false);
+        setImageFile(null);
+        dispatch(fetchParcels());
+      } else {
+        const data = await response.json();
+        alert(`Upload Error: ${data.message || 'Failed to upload'}`);
+      }
+    } catch (err) {
+      alert('Network error during image upload');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -198,6 +235,14 @@ const ParcelsManagement: React.FC = () => {
                       Update Status
                     </button>
                     
+{['company_admin', 'warehouse_staff'].includes(currentRole || '') && (                      <button
+                        onClick={() => { setSelectedParcel(parcel); setImageFile(null); setIsImageModalOpen(true); }}
+                        className="text-blue-500 hover:text-blue-700 transition-colors font-medium px-2 py-1 rounded hover:bg-blue-50"
+                      >
+                        Images
+                      </button>
+                    )}
+
                     {currentRole === 'company_admin' && (
                       <button
                         onClick={() => handleDelete(parcel.id)}
@@ -304,6 +349,55 @@ const ParcelsManagement: React.FC = () => {
               <div className="flex justify-end pt-4 space-x-3 mt-2">
                 <button type="button" onClick={() => setIsStatusModalOpen(false)} className="px-5 py-2 text-sm font-medium rounded-lg text-brand-900 bg-brand-100 hover:bg-brand-300 transition-colors duration-200">Cancel</button>
                 <button type="submit" className="px-5 py-2 text-sm font-medium text-white rounded-lg bg-brand-500 hover:bg-brand-900 shadow-sm transition-colors duration-200">Update Status</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isImageModalOpen && selectedParcel && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 backdrop-blur-sm transition-opacity"
+          onClick={() => setIsImageModalOpen(false)}
+        >
+          <div 
+            className="w-full max-w-md p-7 bg-white shadow-2xl rounded-2xl border border-brand-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-6 text-xl font-bold text-brand-900">Manage Parcel Images</h3>
+            
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-brand-900 mb-2">Uploaded Images</h4>
+              {selectedParcel.imageUrls && selectedParcel.imageUrls.length > 0 ? (
+                <ul className="space-y-1">
+                  {selectedParcel.imageUrls.map((img: string, idx: number) => (
+                    <li key={idx} className="text-xs text-gray-600 bg-gray-50 p-2 rounded border truncate" title={img}>
+                      {img.split('/').pop()}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-gray-500 italic">No images uploaded yet.</p>
+              )}
+            </div>
+
+            <form onSubmit={handleImageUpload} className="space-y-4">
+              <div>
+                <label className="block mb-1.5 text-sm font-medium text-brand-900">Upload New Image</label>
+                <input 
+                  type="file" 
+                  accept="image/jpeg, image/png, image/webp"
+                  onChange={handleImageFileChange} 
+                  required 
+                  className="w-full px-3 py-2 text-sm border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900" 
+                />
+              </div>
+
+              <div className="flex justify-end pt-4 space-x-3 mt-2">
+                <button type="button" onClick={() => setIsImageModalOpen(false)} className="px-5 py-2 text-sm font-medium rounded-lg text-brand-900 bg-brand-100 hover:bg-brand-300 transition-colors duration-200" disabled={isUploading}>Cancel</button>
+                <button type="submit" className="px-5 py-2 text-sm font-medium text-white rounded-lg bg-brand-500 hover:bg-brand-900 shadow-sm transition-colors duration-200" disabled={isUploading}>
+                  {isUploading ? 'Uploading...' : 'Upload Image'}
+                </button>
               </div>
             </form>
           </div>
