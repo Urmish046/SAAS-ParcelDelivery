@@ -8,6 +8,7 @@ export enum ParcelStatus {
   SCANNED = 'scanned',
   SHIPPED = 'shipped',
   AVAILABLE_FOR_PICKUP = 'available_for_pickup',
+  PAYMENT_UNDER_REVIEW = 'payment_under_review',
   COMPLETED = 'completed',
   RETURNED = 'returned',
 }
@@ -29,6 +30,12 @@ export class Parcel {
 
   @Column()
   description!: string;
+
+  @Column({ default: false })
+  isCustomerConfirmed!: boolean;
+
+  @Column({ type: 'varchar', nullable: true })
+  paymentReceiptUrl!: string;
 
   @Column('text', { array: true, nullable: true })
   imageUrls!: string[];
@@ -71,6 +78,4 @@ export class Parcel {
 
   @UpdateDateColumn()
   updatedAt!: Date;
-
-  
 }

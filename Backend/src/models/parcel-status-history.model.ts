@@ -20,7 +20,7 @@ export class ParcelStatusHistory {
   changedById!: string;
 
   @Column()
-  changedByType!: string; // 'user' ya 'customer'
+  changedByType!: string; 
 
   @CreateDateColumn()
   createdAt!: Date;

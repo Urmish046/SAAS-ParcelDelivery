@@ -167,7 +167,8 @@ const DashboardOverview: React.FC = () => {
               {recentParcels.map((parcel: any) => (
                 <tr key={parcel.id} className="hover:bg-gray-50">
                   <td className="px-5 py-3 font-mono text-xs text-brand-900">
-                    {parcel.trackingNumber || '—'}
+                    {/* 👇 Yahan mene variable ka naam theek kar diya hai */}
+                    {parcel.originalTrackingNumber || parcel.internalTrackingId || '—'}
                   </td>
                   <td className="px-5 py-3 text-gray-600">
                     {parcel.customerName || parcel.customer?.name || '—'}

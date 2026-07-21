@@ -13,7 +13,9 @@ import { WarehouseModule } from './modules/warehouse/warehouse.module';
 import { CustomerModule } from './modules/customer/customer.module';
 import { ParcelModule } from './modules/parcel/parcel.module';
 import { StatsModule } from './stats/stats.module';
-
+import { EmailModule } from './email/email.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { NotificationService } from './modules/notifications/notification.service';
 
 @Module({
   imports: [
@@ -41,8 +43,8 @@ import { StatsModule } from './stats/stats.module';
     CustomerModule,
     ParcelModule,
     StatsModule,
-
-
+    EmailModule,
+    EventEmitterModule.forRoot(), 
   ],
   controllers: [AppController],
   providers: [
@@ -55,6 +57,7 @@ import { StatsModule } from './stats/stats.module';
       provide: APP_GUARD,
       useClass: RolesGuard,
     },
+    NotificationService,
   ],
 })
 export class AppModule {}

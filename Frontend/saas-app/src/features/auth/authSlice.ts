@@ -2,24 +2,30 @@ import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/tool
 import api from '../../api/axiosConfig';
 import type { AuthState, User } from '../../types';
 
-const persistedUser = localStorage.getItem('user');
+const isSuperAdmin = window.location.pathname.startsWith('/super-admin');
+const isCustomer = window.location.pathname.startsWith('/customer');
 
+const userKey = isSuperAdmin ? 'super_admin_user' : (isCustomer ? 'customer_user' : 'admin_user');
+const tokenKey = isSuperAdmin ? 'super_admin_token' : (isCustomer ? 'customer_token' : 'admin_token');
+
+const persistedUser = localStorage.getItem(userKey);
+const persistedToken = localStorage.getItem(tokenKey);
 const initialState: AuthState = {
   user: persistedUser ? JSON.parse(persistedUser) : null,
-  token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token'),
+  token: persistedToken,
+  isAuthenticated: !!persistedToken,
   status: 'idle',
   error: null,
 };
 
 export const customerLogin = createAsyncThunk(
   'auth/customerLogin',
-  async (credentials: { email: string; password: string; companyId: string }, { rejectWithValue }) => {
+  async (credentials: { email: string; password: string }, { rejectWithValue }) => {
     try {
       const response = await api.post('/auth/customer-login', credentials);
-      localStorage.setItem('token', response.data.access_token);
+      localStorage.setItem('customer_token', response.data.access_token);
       if (response.data.user) {
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        localStorage.setItem('customer_user', JSON.stringify(response.data.user));
       }
       return response.data;
     } catch (error: any) {
@@ -33,9 +39,9 @@ export const adminLogin = createAsyncThunk(
   async (credentials: { email: string; password: string }, { rejectWithValue }) => {
     try {
       const response = await api.post('/auth/login', credentials);
-      localStorage.setItem('token', response.data.access_token);
+      localStorage.setItem('admin_token', response.data.access_token);
       if (response.data.user) {
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        localStorage.setItem('admin_user', JSON.stringify(response.data.user));
       }
       return response.data;
     } catch (error: any) {
@@ -49,9 +55,9 @@ export const superAdminLogin = createAsyncThunk(
   async (credentials: { email: string; password: string }, { rejectWithValue }) => {
     try {
       const response = await api.post('/auth/super-admin/login', credentials);
-      localStorage.setItem('token', response.data.access_token);
+      localStorage.setItem('super_admin_token', response.data.access_token);
       if (response.data.user) {
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        localStorage.setItem('super_admin_user', JSON.stringify(response.data.user));
       }
       return response.data;
     } catch (error: any) {
@@ -68,8 +74,15 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+
+      const isSuper = window.location.pathname.startsWith('/super-admin');
+      if (isSuper) {
+        localStorage.removeItem('super_admin_token');
+        localStorage.removeItem('super_admin_user');
+      } else {
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_user');
+      }
     },
     setUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;

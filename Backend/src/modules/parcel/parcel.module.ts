@@ -5,11 +5,14 @@ import { ParcelController } from './parcel.controller';
 import { Parcel } from '../../models/parcel.model';
 import { ParcelStatusHistory } from '../../models/parcel-status-history.model';
 import { StorageModule } from '../../storage/storage.module';
-
+import { EmailModule } from '../../email/email.module';
+import { PricingModule } from '../../pricing/pricing.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Parcel, ParcelStatusHistory]),
-    StorageModule
+    StorageModule,
+    EmailModule,
+    PricingModule
   ],
   controllers: [ParcelController],
   providers: [ParcelService],

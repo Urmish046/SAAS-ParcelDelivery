@@ -5,7 +5,7 @@ import type { RootState } from '../store/store';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles: string[];
+  allowedRoles?: string[];
   redirectPath?: string;
 }
 
@@ -20,7 +20,7 @@ export const ProtectedRoute = ({
     return <Navigate to={redirectPath} replace />;
   }
 
-  if (!allowedRoles.includes(user.role)) {
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to={redirectPath} replace />;
   }
 

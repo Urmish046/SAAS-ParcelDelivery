@@ -13,7 +13,13 @@ import StaffManagement from '../pages/admin/StaffManagement';
 import CustomersManagement from '../pages/admin/CustomersManagement';
 import ParcelsManagement from '../pages/admin/ParcelsManagement';
 import SuperAdminDashboard from '../pages/super-admin/SuperAdminDashboard';
+import AddParcel from '../pages/customer/AddParcel';
+import MyParcels from '../pages/customer/MyParcels';
 
+// Customer Portal Imports
+import CustomerLoginPage from '../pages/auth/CustomerLoginPage';
+import CustomerLayout from '../components/layout/CustomerLayout';
+import CustomerDashboard from '../pages/customer/CustomerDashboard';
 
 const AppRoutes: React.FC = () => {
   return (
@@ -50,6 +56,22 @@ const AppRoutes: React.FC = () => {
         >
           <Route path="dashboard" element={<SuperAdminDashboard />} />
           <Route path="companies" element={<CompaniesList />} />
+        </Route>
+
+        {/* Customer Portal Routes */}
+        <Route path="/customer/login" element={<CustomerLoginPage />} />
+        
+        <Route 
+          path="/customer" 
+          element={
+            <ProtectedRoute allowedRoles={['customer']} redirectPath="/customer/login">
+              <CustomerLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="dashboard" element={<CustomerDashboard />} />
+          <Route path="add-parcel" element={<AddParcel />} />
+          <Route path="my-parcels" element={<MyParcels />} />
         </Route>
         
         <Route path="*" element={

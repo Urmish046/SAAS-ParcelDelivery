@@ -22,7 +22,7 @@ export class AuthController {
   @Public()
   @Post('customer-login')
   customerLogin(@Body() body: any) {
-    return this.authService.customerLogin(body.email, body.password, body.companyId);
+    return this.authService.customerLogin(body.email, body.password);
   }
 
   @Public()

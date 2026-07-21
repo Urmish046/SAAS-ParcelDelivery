@@ -92,18 +92,19 @@ export class AuthService {
     };
   }
 
-  async customerLogin(email: string, pass: string, companyId: string) {
+async customerLogin(email: string, pass: string) {
+    // Sirf email se search kar rahe hain
     const customer = await this.customerRepository.findOne({
-      where: { email, companyId },
+      where: { email },
     });
 
     if (!customer) {
-      throw new UnauthorizedException('Invalid email or company context');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     const isPasswordMatching = await bcrypt.compare(pass, customer.password);
     if (!isPasswordMatching) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     const payload = {

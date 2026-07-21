@@ -6,7 +6,19 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const pathname = window.location.pathname;
+    
+    // Path ke hisaab se sahi token key decide karein
+    let tokenKey = 'admin_token'; // Default fallback
+    
+    if (pathname.startsWith('/super-admin')) {
+      tokenKey = 'super_admin_token';
+    } else if (pathname.startsWith('/customer')) {
+      tokenKey = 'customer_token';
+    }
+
+    const token = localStorage.getItem(tokenKey);
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

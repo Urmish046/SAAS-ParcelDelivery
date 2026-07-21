@@ -15,6 +15,7 @@ export interface Parcel {
   shippingCost?: number; 
   customer?: { name: string; email: string };
   warehouse?: { name: string };
+  paymentReceiptUrl?: string;
 }
 
 interface ParcelsState {
@@ -48,26 +49,43 @@ export const createParcel = createAsyncThunk(
       const response = await api.post('/parcels', parcelData);
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to create parcel');
+      const msg = error.response?.data?.message;
+      return rejectWithValue(Array.isArray(msg) ? msg.join(' | ') : (msg || 'Failed to create parcel'));
     }
   }
 );
 
-// Yahan humne naye fields add kiye hain taake typescript error na de
+export const claimParcel = createAsyncThunk(
+  'parcels/claimParcel',
+  async (internalTrackingId: string, { rejectWithValue }) => {
+    try {
+      const response = await api.post('/parcels/claim', { internalTrackingId });
+      return response.data; 
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to track/claim parcel');
+    }
+  }
+);
+
 export const updateParcelStatus = createAsyncThunk(
   'parcels/updateStatus',
-  async ({ id, status, customerTrackingId, weight, dimensions, shippingCost }: { id: string; status: string; customerTrackingId?: string; weight?: number; dimensions?: string; shippingCost?: number }, { rejectWithValue }) => {
+  async (payloadData: any, { rejectWithValue }) => {
     try {
-      const payload: any = { status };
-      if (customerTrackingId) payload.customerTrackingId = customerTrackingId;
-      if (weight !== undefined) payload.weight = weight;
-      if (dimensions !== undefined) payload.dimensions = dimensions;
-      if (shippingCost !== undefined) payload.shippingCost = shippingCost;
-
-      const response = await api.patch(`/parcels/${id}/status`, payload);
+      const { id, ...dataToUpdate } = payloadData;
+      const response = await api.patch(`/parcels/${id}/status`, dataToUpdate);
+      
+      if (dataToUpdate.status === 'scanned' && response.data.status !== 'scanned') {
+         return rejectWithValue("BACKEND BUG: Expected status 'scanned' but got '" + response.data.status + "'");
+      }
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to update parcel status');
+      const errData = error.response?.data;
+      let errorMessage = 'Failed to update parcel status';
+      
+      if (errData && errData.message) {
+        errorMessage = Array.isArray(errData.message) ? errData.message.join(' | ') : errData.message;
+      }
+      return rejectWithValue(`Backend Error: ${errorMessage}`);
     }
   }
 );
@@ -109,21 +127,26 @@ const parcelsSlice = createSlice({
       .addCase(createParcel.fulfilled, (state, action) => {
         state.parcelsList.unshift(action.payload); 
       })
+      .addCase(claimParcel.fulfilled, (state, action) => {
+        state.parcelsList.unshift(action.payload);
+      })
+      .addCase(updateParcelStatus.pending, (state) => {
+        state.error = null; 
+      })
       .addCase(updateParcelStatus.fulfilled, (state, action) => {
-        const index = state.parcelsList.findIndex(p => p.id === action.payload.id);
+        const updatedList = [...state.parcelsList];
+        const index = updatedList.findIndex(p => p.id === action.payload.id);
         if (index !== -1) {
-          state.parcelsList[index] = { ...state.parcelsList[index], ...action.payload };
+          updatedList[index] = action.payload;
+          state.parcelsList = updatedList;    
         }
+      })
+      .addCase(updateParcelStatus.rejected, (state, action) => {
+        state.error = action.payload as string; 
       })
       .addCase(deleteParcel.fulfilled, (state, action) => {
         state.parcelsList = state.parcelsList.filter(p => p.id !== action.payload);
-      })
-      .addCase(createParcel.pending, (state) => {
-        state.error = null;
-      })
-      .addCase(createParcel.rejected, (state, action) => {
-        state.error = action.payload as string;
-      })
+      });
   },
 });
 

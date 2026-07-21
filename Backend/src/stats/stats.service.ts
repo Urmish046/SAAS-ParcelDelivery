@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Company } from '../models/company.model';
 import { User } from '../models/user.model';
+
+
 @Injectable()
 export class StatsService {
   constructor(

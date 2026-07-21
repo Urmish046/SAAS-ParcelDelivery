@@ -42,7 +42,7 @@ export class MinioService implements IStorageService {
       throw new InternalServerErrorException('File upload failed');
     }
   }
-
+  
   async getFileUrl(fileName: string): Promise<string> {
     try {
       return await this.minioClient.presignedGetObject(this.bucketName, fileName, 3600);

@@ -16,7 +16,7 @@ export class WarehouseController {
   }
 
   @Get()
-  @Roles('company_admin', 'warehouse_staff')
+  @Roles('company_admin', 'warehouse_staff', 'customer')
   findAll(@CurrentUser() user: any) {
     return this.warehouseService.findAll(user.companyId);
   }
