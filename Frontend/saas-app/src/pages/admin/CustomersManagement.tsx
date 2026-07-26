@@ -1,17 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchCustomers, createCustomer, updateCustomer, deleteCustomer } from '../../features/customers/customersSlice';
+// 🔥 Apna sahi path yahan zaroor verify kar lein
+import { fetchWarehouses } from '../../features/warehouses/warehousesSlice'; 
 import type { AppDispatch, RootState } from '../../store/store';
 
 const CustomersManagement: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { customersList, status, error } = useSelector((state: RootState) => state.customers);
+  
+  // Destructure customers state
+  const { customersList, status: customerStatus, error } = useSelector((state: RootState) => state.customers);
+  
+  // 🔥 Fetch warehouses state exactly from your provided slice
+  const { warehouses } = useSelector((state: RootState) => state.warehouses);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [address, setAddress] = useState('');
+  const [destinationWarehouseId, setDestinationWarehouseId] = useState(''); // State for new customer warehouse
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -19,23 +29,36 @@ const CustomersManagement: React.FC = () => {
   const [editPhone, setEditPhone] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editPassword, setEditPassword] = useState('');
+  const [editDestinationWarehouseId, setEditDestinationWarehouseId] = useState(''); // State for edit customer warehouse
 
   useEffect(() => {
-    if (status === 'idle') {
+    if (customerStatus === 'idle') {
       dispatch(fetchCustomers());
     }
-  }, [status, dispatch]);
+    // 🔥 Fetch warehouses so the dropdown has data when modal opens
+    if (warehouses.length === 0) {
+      dispatch(fetchWarehouses());
+    }
+  }, [customerStatus, dispatch, warehouses.length]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name && email && phone && password) {
-      await dispatch(createCustomer({ name, email, phone, password, address }));
+    if (name && email && phone && password && destinationWarehouseId) {
+      await dispatch(createCustomer({ 
+        name, 
+        email, 
+        phone, 
+        password, 
+        address, 
+        destinationWarehouseId 
+      }));
       setIsModalOpen(false);
       setName('');
       setEmail('');
       setPhone('');
       setPassword('');
       setAddress('');
+      setDestinationWarehouseId('');
     }
   };
 
@@ -46,13 +69,20 @@ const CustomersManagement: React.FC = () => {
     setEditPhone(customer.phone);
     setEditAddress(customer.address || '');
     setEditPassword('');
+    setEditDestinationWarehouseId(customer.destinationWarehouseId || '');
     setIsEditModalOpen(true);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId && editName && editEmail && editPhone) {
-      const updateData: any = { name: editName, email: editEmail, phone: editPhone, address: editAddress };
+    if (editingId && editName && editEmail && editPhone && editDestinationWarehouseId) {
+      const updateData: any = { 
+        name: editName, 
+        email: editEmail, 
+        phone: editPhone, 
+        address: editAddress,
+        destinationWarehouseId: editDestinationWarehouseId 
+      };
       if (editPassword) {
         updateData.password = editPassword;
       }
@@ -101,17 +131,17 @@ const CustomersManagement: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-100/50">
-              {status === 'loading' && (
+              {customerStatus === 'loading' && (
                 <tr>
                   <td colSpan={4} className="px-6 py-8 text-center text-gray-400 animate-pulse">Loading customers...</td>
                 </tr>
               )}
-              {status === 'succeeded' && customersList.length === 0 && (
+              {customerStatus === 'succeeded' && customersList.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-6 py-8 text-center text-gray-400">No customers found. Create one to get started.</td>
                 </tr>
               )}
-              {status === 'succeeded' && customersList.map((customer) => (
+              {customerStatus === 'succeeded' && customersList.map((customer) => (
                 <tr key={customer.id} className="transition-colors hover:bg-brand-100/20">
                   <td className="px-6 py-4 text-sm font-medium text-brand-900">{customer.name}</td>
                   <td className="px-6 py-4">
@@ -189,6 +219,27 @@ const CustomersManagement: React.FC = () => {
                   className="w-full px-4 py-2.5 text-sm transition-colors border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 text-brand-900"
                 />
               </div>
+              
+              {/* 🔥 Updated Dropdown exactly per your slice data */}
+              <div>
+                <label className="block mb-1.5 text-sm font-medium text-brand-900">
+                  Destination Warehouse <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={destinationWarehouseId}
+                  onChange={(e) => setDestinationWarehouseId(e.target.value)}
+                  required
+                  className="w-full px-4 py-2.5 text-sm transition-colors border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 text-brand-900"
+                >
+                  <option value="" disabled>Select a Warehouse</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} - {w.location}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block mb-1.5 text-sm font-medium text-brand-900">Address (Optional)</label>
                 <textarea
@@ -265,6 +316,27 @@ const CustomersManagement: React.FC = () => {
                   className="w-full px-4 py-2.5 text-sm transition-colors border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 text-brand-900 placeholder:text-gray-400"
                 />
               </div>
+
+              {/* 🔥 Updated Dropdown exactly per your slice data */}
+              <div>
+                <label className="block mb-1.5 text-sm font-medium text-brand-900">
+                  Destination Warehouse <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={editDestinationWarehouseId}
+                  onChange={(e) => setEditDestinationWarehouseId(e.target.value)}
+                  required
+                  className="w-full px-4 py-2.5 text-sm transition-colors border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 text-brand-900"
+                >
+                  <option value="" disabled>Select a Warehouse</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} - {w.location}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block mb-1.5 text-sm font-medium text-brand-900">Address (Optional)</label>
                 <textarea

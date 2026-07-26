@@ -59,12 +59,21 @@ export class Parcel {
   @JoinColumn({ name: 'companyId' })
   company!: Company;
 
+  // Jahan parcel receive/scan/weigh/price hota hai
   @Column({ nullable: true })
-  warehouseId!: string;
+  originWarehouseId!: string;
 
   @ManyToOne(() => Warehouse, { onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'warehouseId' })
-  warehouse!: Warehouse;
+  @JoinColumn({ name: 'originWarehouseId' })
+  originWarehouse!: Warehouse;
+
+  // Jahan parcel deliver/pickup/payment collect hota hai
+  @Column({ nullable: true })
+  destinationWarehouseId!: string;
+
+  @ManyToOne(() => Warehouse, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'destinationWarehouseId' })
+  destinationWarehouse!: Warehouse;
 
   @Column()
   customerId!: string;

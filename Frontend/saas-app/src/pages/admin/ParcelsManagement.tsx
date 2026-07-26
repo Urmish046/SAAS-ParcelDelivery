@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchParcels, createParcel, updateParcelStatus, deleteParcel } from '../../features/parcels/parcelsSlice';
+import { fetchParcels, scanBarcode, updateParcelStatus, deleteParcel } from '../../features/parcels/parcelsSlice';
 import { fetchCustomers } from '../../features/customers/customersSlice';
 import { fetchWarehouses } from '../../features/warehouses/warehousesSlice';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import type { AppDispatch, RootState } from '../../store/store';
 
 const PARCEL_STATUSES = [
@@ -24,23 +25,23 @@ const ParcelsManagement: React.FC = () => {
   const { warehouses } = useSelector((state: RootState) => state.warehouses);
 
   let currentRole = user?.role;
-  
-  if (!currentRole && token) {
+let currentWarehouseId = (user as any)?.warehouseId;  
+const currentWarehouseName = warehouses.find(w => w.id === currentWarehouseId)?.name;
+  if ((!currentRole || !currentWarehouseId) && token) {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      currentRole = payload.role;
-    } catch (e) {}
+      if (!currentRole) currentRole = payload.role;
+      if (!currentWarehouseId) currentWarehouseId = payload.warehouseId;
+    } catch (e) {
+      console.error('Failed to parse auth token payload', e);
+    }
   }
 
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isCameraScanning, setIsCameraScanning] = useState(false);
+
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState<any>(null);
-
-  const [originalTrackingNumber, setOriginalTrackingNumber] = useState('');
-  const [description, setDescription] = useState('');
-  const [weight, setWeight] = useState('');
-  const [customerId, setCustomerId] = useState('');
-  const [warehouseId, setWarehouseId] = useState('');
 
   const [newStatus, setNewStatus] = useState('');
   const [customerTrackingId, setCustomerTrackingId] = useState('');
@@ -50,6 +51,7 @@ const ParcelsManagement: React.FC = () => {
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [notificationBanner, setNotificationBanner] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'idle') dispatch(fetchParcels());
@@ -63,38 +65,125 @@ const ParcelsManagement: React.FC = () => {
     };
 
     window.addEventListener('focus', handleFocus);
-
     return () => {
       window.removeEventListener('focus', handleFocus);
     };
   }, [dispatch]);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (originalTrackingNumber && description && weight && customerId && warehouseId) {
-      const payload: any = {
-        originalTrackingNumber,
-        description,
-        weight: parseFloat(weight),
-        customerId,
-        warehouseId
-      };
+  // --- HELPER TO CHECK IF CURRENT USER CAN UPDATE PARCEL STATUS ---
+  const canUserUpdateParcel = (parcel: any): boolean => {
+    if (currentRole === 'company_admin') return true;
+    if (currentRole !== 'warehouse_staff') return false;
 
-      const resultAction = await dispatch(createParcel(payload));
-      
-      if (createParcel.fulfilled.match(resultAction)) {
-        setIsCreateModalOpen(false);
-        setOriginalTrackingNumber(''); setDescription(''); setWeight(''); setCustomerId(''); setWarehouseId('');
-        dispatch(fetchParcels()); 
-      } else {
-        console.log("Backend Error:", resultAction.payload);
+    const originWhId = parcel.originWarehouseId || parcel.originWarehouse?.id;
+    const destWhId = parcel.destinationWarehouseId || parcel.destinationWarehouse?.id;
+
+    // Once status is shipped or beyond, sending warehouse cannot update it further
+    if (['shipped', 'available_for_pickup', 'payment_under_review', 'completed', 'returned'].includes(parcel.status)) {
+      if (currentWarehouseId && currentWarehouseId === originWhId && currentWarehouseId !== destWhId) {
+        return false;
       }
+      if (currentWarehouseId && currentWarehouseId === destWhId) {
+        return true;
+      }
+    } else {
+      // Pending or Scanned stage: Origin warehouse staff can update
+      if (currentWarehouseId && currentWarehouseId === originWhId) {
+        return true;
+      }
+      if (currentWarehouseId && currentWarehouseId === destWhId && currentWarehouseId !== originWhId) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  // --- FILTER STATUS OPTIONS BASED ON WAREHOUSE ROLE ---
+  const getAvailableStatusesForParcel = (parcel: any) => {
+    if (!parcel) return PARCEL_STATUSES;
+    if (currentRole === 'company_admin') return PARCEL_STATUSES;
+
+    const originWhId = parcel.originWarehouseId || parcel.originWarehouse?.id;
+    const destWhId = parcel.destinationWarehouseId || parcel.destinationWarehouse?.id;
+
+    if (currentRole === 'warehouse_staff' && currentWarehouseId === destWhId && currentWarehouseId !== originWhId) {
+      return PARCEL_STATUSES.filter(s => ['shipped', 'available_for_pickup', 'payment_under_review', 'completed', 'returned'].includes(s.value));
+    }
+
+    if (currentRole === 'warehouse_staff' && currentWarehouseId === originWhId) {
+      return PARCEL_STATUSES.filter(s => ['pending', 'scanned', 'shipped'].includes(s.value));
+    }
+
+    return PARCEL_STATUSES;
+  };
+
+  // --- SMART PROCESS BARCODE (SHARED BY CAMERA & ENTER KEY) ---
+  const processScannedCode = async (code: string) => {
+    const cleanCode = code.trim();
+    if (!cleanCode) return;
+
+    // 1. Check if parcel exists in current list
+    const existingParcel = parcelsList.find(
+      p => p.originalTrackingNumber?.toLowerCase() === cleanCode.toLowerCase() || 
+           p.customerTrackingId?.toLowerCase() === cleanCode.toLowerCase() ||
+           p.internalTrackingId?.toLowerCase() === cleanCode.toLowerCase()
+    );
+
+    if (existingParcel) {
+      if (canUserUpdateParcel(existingParcel)) {
+        handleOpenStatusModal(existingParcel, false);
+      } else {
+        alert('This parcel has been shipped. Status updates must be performed by the destination warehouse.');
+      }
+      setSearchQuery('');
+    } else if (currentRole === 'warehouse_staff' || currentRole === 'company_admin') {
+      // Trigger scan and receive for new inbound package
+      const resultAction = await dispatch(scanBarcode(cleanCode));
+      
+      if (scanBarcode.fulfilled.match(resultAction)) {
+        dispatch(fetchParcels()); 
+        setNotificationBanner('New parcel arrived and registered at warehouse.');
+        handleOpenStatusModal(resultAction.payload, true);
+        setSearchQuery('');
+      } else {
+        alert(`Error: Tracking ID not found in system or customer requests. Error: ${resultAction.payload}`);
+      }
+    } else {
+      alert('Parcel not found in current view.');
     }
   };
 
-  const handleOpenStatusModal = (parcel: any) => {
+  // --- HANDLE KEY DOWN ON SEARCH INPUT (ENTER KEY TRIGGER) ---
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      processScannedCode(searchQuery);
+    }
+  };
+
+  // --- MOBILE CAMERA SCANNER EFFECT ---
+  useEffect(() => {
+    let scanner: Html5QrcodeScanner | null = null;
+    if (isCameraScanning) {
+      scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 150 } }, false);
+      scanner.render(
+        (decodedText) => {
+          if (scanner) scanner.clear().catch(e => console.error(e));
+          setIsCameraScanning(false);
+          setSearchQuery(decodedText);
+          processScannedCode(decodedText);
+        },
+        (error) => {} // ignore scanning errors
+      );
+    }
+    return () => { if (scanner) scanner.clear().catch(e => console.error(e)); };
+  }, [isCameraScanning, currentRole, dispatch, parcelsList]);
+
+  // Open status modal
+  const handleOpenStatusModal = (parcel: any, isNewlyScanned: boolean = false) => {
     setSelectedParcel(parcel);
-    setNewStatus(parcel.status);
+    setNewStatus(isNewlyScanned ? 'scanned' : parcel.status); 
     setCustomerTrackingId(parcel.customerTrackingId || '');
     setUpdateWeight(parcel.weight?.toString() || '');
     setUpdateShippingCost(parcel.shippingCost?.toString() || '');
@@ -147,16 +236,18 @@ const ParcelsManagement: React.FC = () => {
 
             if (!response.ok) {
               const data = await response.json();
-              alert(`Status Updated, but Image Upload Error: ${data.message || 'Failed to upload'}`);
+              alert(`Status updated, but image upload failed: ${data.message || 'Failed to upload'}`);
             }
           } catch (err) {
-            alert('Status Updated, but network error during image upload.');
+            alert('Status updated, but network error occurred during image upload.');
           }
         }
 
         setIsStatusModalOpen(false);
         setSelectedParcel(null);
         setImageFile(null);
+        setSearchQuery('');
+        
         dispatch(fetchParcels()); 
       } else {
         alert(`Error: ${resultAction.payload}`); 
@@ -185,32 +276,133 @@ const ParcelsManagement: React.FC = () => {
     }
   };
 
+ const filteredParcels = parcelsList.filter((parcel) => {
+  // Warehouse staff should only see parcels tied to their own warehouse (as origin or destination)
+  if (currentRole === 'warehouse_staff') {
+    const originWhId = parcel.originWarehouseId || parcel.originWarehouse?.id;
+    const destWhId = parcel.destinationWarehouseId || parcel.destinationWarehouse?.id;
+    if (originWhId !== currentWarehouseId && destWhId !== currentWarehouseId) {
+      return false;
+    }
+  }
+
+  if (!searchQuery.trim()) return true;
+
+  const query = searchQuery.toLowerCase();
+  return (
+    (parcel.originalTrackingNumber && parcel.originalTrackingNumber.toLowerCase().includes(query)) ||
+    (parcel.internalTrackingId && parcel.internalTrackingId.toLowerCase().includes(query)) ||
+    (parcel.customerTrackingId && parcel.customerTrackingId.toLowerCase().includes(query))
+  );
+});
+  // Inbound notifications for Destination Warehouse
+  const inboundDestinationParcels = parcelsList.filter((p) => {
+    const destWhId = p.destinationWarehouseId || p.destinationWarehouse?.id;
+    return p.status === 'shipped' && destWhId === currentWarehouseId;
+  });
+
+  // Arrival notifications for Origin Warehouse
+  const originNewlyScannedParcels = parcelsList.filter((p) => {
+    const originWhId = p.originWarehouseId || p.originWarehouse?.id;
+    return p.status === 'scanned' && originWhId === currentWarehouseId;
+  });
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 relative">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-brand-900">
-            {currentRole === 'warehouse_staff' ? 'Warehouse Parcels' : 'All Parcels'}
-          </h2>
+        <h2 className="text-2xl font-bold text-brand-900">
+  {currentRole === 'warehouse_staff' 
+    ? (currentWarehouseName ? `${currentWarehouseName} Parcels` : 'Warehouse Parcels')
+    : 'All Parcels'}
+</h2>
           <p className="text-sm text-gray-500 mt-1">
             {currentRole === 'warehouse_staff' 
-              ? 'Manage inbound and outbound packages for your location' 
+              ? 'Scan or type tracking ID to receive and manage packages' 
               : 'Manage all inbound and outbound packages'}
           </p>
         </div>
-        {currentRole === 'company_admin' && (
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 bg-brand-500 rounded-lg shadow-sm hover:bg-brand-900 hover:shadow-md active:scale-95"
+      </div>
+
+      {/* --- NOTIFICATION BANNERS --- */}
+      {notificationBanner && (
+        <div className="p-4 text-sm text-emerald-800 bg-emerald-100 border border-emerald-300 rounded-lg flex justify-between items-center shadow-sm">
+          <span className="font-medium"> {notificationBanner}</span>
+          <button 
+            onClick={() => setNotificationBanner(null)} 
+            className="font-bold text-emerald-900 hover:text-emerald-950 px-2"
           >
-            + Add Parcel
+            &times;
           </button>
-        )}
+        </div>
+      )}
+
+      {/* Destination Warehouse Notification */}
+      {currentRole === 'warehouse_staff' && inboundDestinationParcels.length > 0 && (
+        <div className="p-4 text-sm text-blue-900 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between shadow-sm">
+          <div>
+            <span className="font-bold">📥 Incoming Shipment Alert:</span> You have{' '}
+            <span className="font-bold underline">{inboundDestinationParcels.length}</span> parcel(s) shipped to your destination warehouse. You can now update their status upon arrival.
+          </div>
+        </div>
+      )}
+
+      {/* Origin Warehouse Notification */}
+      {currentRole === 'warehouse_staff' && originNewlyScannedParcels.length > 0 && (
+        <div className="p-4 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between shadow-sm">
+          <div>
+            <span className="font-bold">📦 Warehouse Arrival Notice:</span> You have{' '}
+            <span className="font-bold underline">{originNewlyScannedParcels.length}</span> parcel(s) recently received and scanned at your origin warehouse.
+          </div>
+        </div>
+      )}
+
+      {/* --- SMART SEARCH / SCAN BAR & CAMERA BUTTON --- */}
+      <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+        <div className="relative w-full max-w-md">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <span className="text-gray-500 sm:text-sm">🔍</span>
+          </div>
+          <input
+            type="text"
+            placeholder="Search or Press Enter to Receive Parcel..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            className="w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg shadow-sm border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500 text-brand-900 bg-white"
+          />
+        </div>
+        
+        <button
+          onClick={() => setIsCameraScanning(true)}
+          className="w-full sm:w-auto px-4 py-2.5 text-sm font-medium text-white bg-brand-500 hover:bg-brand-900 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
+        >
+          <span>📷</span> Scan via Camera
+        </button>
       </div>
 
       {error && (
         <div className="p-4 text-sm text-red-700 bg-red-100 border border-red-200 rounded-lg">
           {error}
+        </div>
+      )}
+
+      {/* --- MOBILE CAMERA SCANNER MODAL --- */}
+      {isCameraScanning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-white p-6 rounded-2xl shadow-2xl space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold text-brand-900">Scan Barcode with Camera</h3>
+              <button 
+                onClick={() => setIsCameraScanning(false)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl px-2"
+              >
+                &times;
+              </button>
+            </div>
+            <div id="reader" className="w-full overflow-hidden rounded-lg"></div>
+            <p className="text-xs text-gray-500 text-center">Position the barcode inside the frame to scan automatically.</p>
+          </div>
         </div>
       )}
 
@@ -220,160 +412,168 @@ const ParcelsManagement: React.FC = () => {
             <thead className="bg-brand-100/40">
               <tr>
                 <th className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-brand-900 uppercase">Tracking & Details</th>
-                <th className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-brand-900 uppercase">Customer & Warehouse</th>
+                <th className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-brand-900 uppercase">Customer</th>
+                <th className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-brand-900 uppercase">Route</th>
                 <th className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-brand-900 uppercase">Status</th>
                 <th className="px-6 py-4 text-xs font-semibold tracking-wider text-right text-brand-900 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-100/50">
               {status === 'loading' && (
-                <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-400 animate-pulse">Loading parcels...</td></tr>
+                <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-400 animate-pulse">Loading parcels...</td></tr>
               )}
-              {status === 'succeeded' && parcelsList.length === 0 && (
-                <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-400">No parcels found.</td></tr>
-              )}
-              {status === 'succeeded' && parcelsList.map((parcel) => (
-                <tr key={parcel.id} className="transition-colors hover:bg-brand-100/20">
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-bold text-brand-900">{parcel.internalTrackingId}</div>
-                    <div className="text-sm text-gray-900 mt-1">{parcel.description}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {parcel.weight} kg {parcel.shippingCost && `• Shipping: $${parcel.shippingCost}`}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-brand-900">{parcel.customer?.name || 'Unknown'}</div>
-                    <div className="text-sm text-gray-500 mt-1">{parcel.warehouse?.name || 'Unknown Warehouse'}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
-                      ${parcel.status === 'completed' ? 'bg-green-100 text-green-800' : 
-                        parcel.status === 'shipped' ? 'bg-blue-100 text-blue-800' : 
-                        parcel.status === 'returned' ? 'bg-red-100 text-red-800' : 
-                        parcel.status === 'payment_under_review' ? 'bg-purple-100 text-purple-800' :
-                        'bg-yellow-100 text-yellow-800'}`}>
-                      {parcel.status.replace(/_/g, ' ')}
-                    </span>
-                    {parcel.customerTrackingId && (
-                      <div className="text-xs text-gray-500 mt-1">Trk: {parcel.customerTrackingId}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium text-right space-x-3">
-                    
-                    {parcel.status === 'payment_under_review' && currentRole === 'company_admin' && (
-                      <>
-                        {parcel.paymentReceiptUrl && (
-                          <a 
-                            href={parcel.paymentReceiptUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors"
-                          >
-                            View Receipt
-                          </a>
-                        )}
-                        <button
-                          onClick={() => handleApprovePayment(parcel.id)}
-                          className="text-green-600 hover:text-green-800 transition-colors font-medium px-2 py-1 rounded hover:bg-green-50"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => handleRejectPayment(parcel.id)}
-                          className="text-red-500 hover:text-red-700 transition-colors font-medium px-2 py-1 rounded hover:bg-red-50"
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
-
-                    <button
-                      onClick={() => handleOpenStatusModal(parcel)}
-                      className="text-brand-500 hover:text-brand-900 transition-colors font-medium px-2 py-1 rounded hover:bg-brand-100/50"
-                    >
-                      Update Status
-                    </button>
-
-                    {currentRole === 'company_admin' && (
-                      <button
-                        onClick={() => handleDelete(parcel.id)}
-                        className="text-red-500 hover:text-red-700 transition-colors font-medium px-2 py-1 rounded hover:bg-red-50"
-                      >
-                        Delete
-                      </button>
-                    )}
+              {status === 'succeeded' && filteredParcels.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-400">
+                    {searchQuery ? 'No parcels match your search. Press Enter to try receiving it.' : 'No parcels found.'}
                   </td>
                 </tr>
-              ))}
+              )}
+              {status === 'succeeded' && filteredParcels.map((parcel) => {
+                const isEditable = canUserUpdateParcel(parcel);
+                  const isCompleted = parcel.status === 'completed';
+
+
+                return (
+                  <tr key={parcel.id}  className={`transition-colors ${
+        isCompleted 
+          ? 'bg-gray-50/60 opacity-70' 
+          : 'hover:bg-brand-100/20'
+      }`}>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-bold text-brand-900">{parcel.originalTrackingNumber || parcel.internalTrackingId}</div>
+                       {isCompleted && (
+      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 uppercase tracking-wide">
+        Archived
+      </span>
+    )}
+                      <div className="text-sm text-gray-900 mt-1">{parcel.description}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {parcel.weight} kg {parcel.shippingCost && `• Shipping: $${parcel.shippingCost}`}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-brand-900">{parcel.customer?.name || 'Unknown'}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-700">
+                        <span className="font-medium">{parcel.originWarehouse?.name || 'Unknown'}</span>
+                        <span className="mx-1.5 text-gray-400">→</span>
+                        <span className="font-medium">{parcel.destinationWarehouse?.name || 'Unknown'}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col items-start gap-1.5">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
+                          ${parcel.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                            parcel.status === 'shipped' ? 'bg-blue-100 text-blue-800' : 
+                            parcel.status === 'returned' ? 'bg-red-100 text-red-800' : 
+                            parcel.status === 'payment_under_review' ? 'bg-purple-100 text-purple-800' :
+                            'bg-yellow-100 text-yellow-800'}`}>
+                          {parcel.status.replace(/_/g, ' ')}
+                        </span>
+                        
+                        {parcel.status !== 'pending' && (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                            parcel.isCustomerConfirmed 
+                              ? 'bg-green-50 text-green-700 border-green-200' 
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            {parcel.isCustomerConfirmed ? '✓ Confirmed by Customer' : '⌛ Pending Confirmation'}
+                          </span>
+                        )}
+
+                        {parcel.customerTrackingId && (
+                          <div className="text-xs text-gray-500 mt-0.5 font-mono">Trk: {parcel.customerTrackingId}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-right space-x-3">
+                      
+                      {parcel.status === 'payment_under_review' && (currentRole === 'company_admin' || currentRole === 'warehouse_staff') && (
+                        <>
+                          {parcel.paymentReceiptUrl && (
+                            <a 
+                              href={parcel.paymentReceiptUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                            >
+                              View Receipt
+                            </a>
+                          )}
+                          <button
+                            onClick={() => handleApprovePayment(parcel.id)}
+                            className="text-green-600 hover:text-green-800 transition-colors font-medium px-2 py-1 rounded hover:bg-green-50"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleRejectPayment(parcel.id)}
+                            className="text-red-500 hover:text-red-700 transition-colors font-medium px-2 py-1 rounded hover:bg-red-50"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+
+                      {isCompleted ? (
+  <span className="text-xs text-gray-400 italic px-2 py-1">
+    No further action needed
+  </span>
+) : isEditable ? (
+  <button
+    onClick={() => handleOpenStatusModal(parcel)}
+    className="text-brand-500 hover:text-brand-900 transition-colors font-medium px-2 py-1 rounded hover:bg-brand-100/50"
+  >
+    Update Status
+  </button>
+) : (
+  <span className="text-xs text-gray-400 italic px-2 py-1 bg-gray-100 rounded cursor-not-allowed" title="Status updates are restricted to the Destination Warehouse after shipment">
+    Managed by Other Warehouse
+  </span>
+)}
+
+                      {currentRole === 'company_admin' && (
+                        <button
+                          onClick={() => handleDelete(parcel.id)}
+                          className="text-red-500 hover:text-red-700 transition-colors font-medium px-2 py-1 rounded hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      {isCreateModalOpen && currentRole === 'company_admin' && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 backdrop-blur-sm transition-opacity"
-          onClick={() => setIsCreateModalOpen(false)}
-        >
-          <div 
-            className="w-full max-w-lg p-7 bg-white shadow-2xl rounded-2xl border border-brand-100"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="mb-6 text-xl font-bold text-brand-900">Add New Parcel</h3>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div>
-                <label className="block mb-1.5 text-sm font-medium text-brand-900">Original Tracking No.</label>
-                <input type="text" value={originalTrackingNumber} onChange={(e) => setOriginalTrackingNumber(e.target.value)} required placeholder="e.g., TBA123456789" className="w-full px-4 py-2.5 text-sm border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block mb-1.5 text-sm font-medium text-brand-900">Description</label>
-                  <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} required placeholder="e.g., PS5" className="w-full px-4 py-2.5 text-sm border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900" />
-                </div>
-                <div>
-                  <label className="block mb-1.5 text-sm font-medium text-brand-900">Est. Weight (kg)</label>
-                  <input type="number" step="0.01" value={weight} onChange={(e) => setWeight(e.target.value)} required className="w-full px-4 py-2.5 text-sm border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900" />
-                </div>
-              </div>
-              <div>
-                <label className="block mb-1.5 text-sm font-medium text-brand-900">Select Customer</label>
-                <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} required className="w-full px-4 py-2.5 text-sm border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900">
-                  <option value="" disabled>Select a customer</option>
-                  <option value="test">Test User</option> {/* Added for placeholder fix */}
-                  {customersList.map(c => <option key={c.id} value={c.id}>{c.name} ({c.email})</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block mb-1.5 text-sm font-medium text-brand-900">Select Warehouse</label>
-                <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} required className="w-full px-4 py-2.5 text-sm border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900">
-                  <option value="" disabled>Select a warehouse</option>
-                  {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
-              </div>
-              <div className="flex justify-end pt-4 space-x-3 mt-2">
-                <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-5 py-2 text-sm font-medium rounded-lg text-brand-900 bg-brand-100 hover:bg-brand-300 transition-colors duration-200">Cancel</button>
-                <button type="submit" className="px-5 py-2 text-sm font-medium text-white rounded-lg bg-brand-500 hover:bg-brand-900 shadow-sm transition-colors duration-200">Save Parcel</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
+      {/* --- STATUS & DATA CAPTURE MODAL --- */}
       {isStatusModalOpen && selectedParcel && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 backdrop-blur-sm transition-opacity p-4"
           onClick={() => setIsStatusModalOpen(false)}
         >
           <div 
             className="w-full max-w-md p-7 bg-white shadow-2xl rounded-2xl border border-brand-100"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="mb-6 text-xl font-bold text-brand-900">Update Status</h3>
+            <h3 className="mb-6 text-xl font-bold text-brand-900">Update Status & Details</h3>
             <form onSubmit={handleUpdateStatus} className="space-y-4">
               <div>
                 <label className="block mb-1.5 text-sm font-medium text-brand-900">Parcel Status</label>
-                <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} required className="w-full px-4 py-2.5 text-sm border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900 capitalize">
-                  {PARCEL_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                <select 
+                  value={newStatus} 
+                  onChange={(e) => setNewStatus(e.target.value)} 
+                  required 
+                  className="w-full px-4 py-2.5 text-sm border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900 capitalize"
+                >
+                  {getAvailableStatusesForParcel(selectedParcel).map(s => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
                 </select>
               </div>
 
@@ -420,14 +620,31 @@ const ParcelsManagement: React.FC = () => {
               {newStatus === 'shipped' && (
                 <div>
                   <label className="block mb-1.5 text-sm font-medium text-brand-900">Final Tracking ID (e.g., DHL/FedEx)</label>
-                  <input type="text" value={customerTrackingId} onChange={(e) => setCustomerTrackingId(e.target.value)} required className="w-full px-4 py-2.5 text-sm border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900" />
+                  <input 
+                    type="text" 
+                    value={customerTrackingId} 
+                    onChange={(e) => setCustomerTrackingId(e.target.value)} 
+                    required 
+                    className="w-full px-4 py-2.5 text-sm border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900" 
+                  />
                 </div>
               )}
 
               <div className="flex justify-end pt-4 space-x-3 mt-2">
-                <button type="button" onClick={() => setIsStatusModalOpen(false)} className="px-5 py-2 text-sm font-medium rounded-lg text-brand-900 bg-brand-100 hover:bg-brand-300 transition-colors duration-200" disabled={isUpdating}>Cancel</button>
-                <button type="submit" className="px-5 py-2 text-sm font-medium text-white rounded-lg bg-brand-500 hover:bg-brand-900 shadow-sm transition-colors duration-200" disabled={isUpdating}>
-                  {isUpdating ? 'Updating...' : 'Update Status'}
+                <button 
+                  type="button" 
+                  onClick={() => setIsStatusModalOpen(false)} 
+                  className="px-5 py-2 text-sm font-medium rounded-lg text-brand-900 bg-brand-100 hover:bg-brand-300 transition-colors duration-200" 
+                  disabled={isUpdating}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-5 py-2 text-sm font-medium text-white rounded-lg bg-brand-500 hover:bg-brand-900 shadow-sm transition-colors duration-200" 
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? 'Updating...' : 'Save Details'}
                 </button>
               </div>
             </form>

@@ -19,6 +19,10 @@ export class CreateCustomerDto {
   phone!: string;
 
   @IsString()
+  @IsNotEmpty()
+  destinationWarehouseId!: string;
+
+  @IsString()
   @IsOptional()
   address?: string;
 }

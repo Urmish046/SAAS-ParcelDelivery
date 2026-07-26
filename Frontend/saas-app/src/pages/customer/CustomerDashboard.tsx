@@ -1,24 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import api from '../../api/axiosConfig';
-import { fetchParcels, claimParcel } from '../../features/parcels/parcelsSlice';
+import { fetchParcels, createPreAlert } from '../../features/parcels/parcelsSlice';
 
 const CustomerDashboard: React.FC = () => {
   const [stats, setStats] = useState({ activeShipments: 0, actionRequired: 0, readyForPickup: 0 });
   
-  // Naya initial loading state, taake page bar bar blink na kare background updates pe
   const [initialLoading, setInitialLoading] = useState(true);
 
-  // Add-tracking form state
   const [trackingNumber, setTrackingNumber] = useState('');
   const [claiming, setClaiming] = useState(false);
   const [claimMsg, setClaimMsg] = useState({ type: '', text: '' });
+  const [searchedId, setSearchedId] = useState('');
 
-  // Image preview modal state
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
 
-  // Payment upload modal state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentParcelId, setPaymentParcelId] = useState<string | null>(null);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -56,21 +53,32 @@ const CustomerDashboard: React.FC = () => {
     !['completed', 'returned'].includes(p.status.toLowerCase())
   );
 
- const handleClaim = async (e: React.FormEvent) => {
+  const displayedParcels = searchedId 
+    ? activeParcels.filter((p: any) => 
+        p.originalTrackingNumber === searchedId || 
+        p.customerTrackingId === searchedId || 
+        p.internalTrackingId === searchedId
+      )
+    : [];
+
+  const handleClaim = async (e: React.FormEvent) => {
     e.preventDefault();
+    const searchTarget = trackingNumber.trim();
 
     const alreadyExists = parcelsList.find((p: any) => 
-      p.originalTrackingNumber === trackingNumber || 
-      p.customerTrackingId === trackingNumber || 
-      p.internalTrackingId === trackingNumber
+      p.originalTrackingNumber === searchTarget || 
+      p.customerTrackingId === searchTarget || 
+      p.internalTrackingId === searchTarget
     );
 
     if (alreadyExists) {
       const pStatus = alreadyExists.status.toLowerCase();
       if (['completed', 'returned'].includes(pStatus)) {
         setClaimMsg({ type: 'error', text: 'This tracking ID is already in your History.' });
+        setSearchedId('');
       } else {
-        setClaimMsg({ type: 'error', text: 'This tracking ID is already in your Active Shipments.' });
+        setClaimMsg({ type: 'success', text: 'Tracking ID already exists in your Active Shipments!' });
+        setSearchedId(searchTarget);
       }
       return;
     }
@@ -79,22 +87,24 @@ const CustomerDashboard: React.FC = () => {
     setClaimMsg({ type: '', text: '' });
 
     try {
-      await dispatch(claimParcel(trackingNumber)).unwrap();
-      setClaimMsg({ type: 'success', text: 'Parcel linked to your account!' });
+      await dispatch(createPreAlert(searchTarget)).unwrap();
+      
+      setClaimMsg({ type: 'success', text: 'Tracking ID added successfully! Awaiting warehouse scan.' });
+      setSearchedId(searchTarget);
       setTrackingNumber('');
       
       fetchAllData();
     } catch (error: any) {
-         setClaimMsg({ type: 'error', text: error || 'Failed to claim parcel. Invalid ID or already claimed.' });      
       setClaimMsg({
         type: 'error',
-        text: 'No parcel found with this Tracking ID in our system.' 
+        text: error?.message || error || 'Failed to add Tracking ID.' 
       });
-      
+      setSearchedId('');
     } finally {
       setClaiming(false);
     }
   };
+
   const handleConfirmShipment = async (parcelId: string) => {
     if (!window.confirm("Are you sure you want to confirm this shipment for dispatch?")) return;
     try {
@@ -174,7 +184,6 @@ const CustomerDashboard: React.FC = () => {
     }
   };
 
-  // Ab sirf page pehli bar load hone par loader aayega
   if (initialLoading) {
     return (
       <div className="w-full pb-12 animate-pulse">
@@ -190,7 +199,6 @@ const CustomerDashboard: React.FC = () => {
   return (
     <div className="w-full pb-12 relative">
 
-      {/* Header */}
       <div className="mb-8 border-b border-gray-200 pb-6">
         <h1 className="text-2xl md:text-3xl font-extrabold text-brand-900 mb-2">
           Dashboard Overview
@@ -200,7 +208,6 @@ const CustomerDashboard: React.FC = () => {
         </p>
       </div>
 
-      {/* Add Tracking Number */}
       <div className="mb-10 p-6 bg-white rounded-xl border border-gray-200 shadow-sm">
         <h3 className="text-sm font-bold text-brand-900 uppercase tracking-wide mb-3">
           Track a New Parcel
@@ -234,7 +241,6 @@ const CustomerDashboard: React.FC = () => {
         </form>
       </div>
 
-      {/* Stats — table */}
       <div className="mb-12 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -266,10 +272,9 @@ const CustomerDashboard: React.FC = () => {
         </table>
       </div>
 
-      {/* Jab tak active shipments 0 rahengi table hide rahega, ek dafa ID add ho jaye toh always show hoga */}
-      {activeParcels.length > 0 && (
+      {displayedParcels.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-brand-900 mb-4">Active Shipments</h2>
+          <h2 className="text-xl font-bold text-brand-900 mb-4">Searched Shipment</h2>
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -283,7 +288,7 @@ const CustomerDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {activeParcels.map((parcel: any) => (
+                  {displayedParcels.map((parcel: any) => (
                     <tr key={parcel.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-bold text-brand-900">{parcel.originalTrackingNumber || parcel.customerTrackingId || 'N/A'}</div>
@@ -303,7 +308,6 @@ const CustomerDashboard: React.FC = () => {
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        {/* Status automatically change ho jayega yahan background hit se */}
                         {getStatusBadge(parcel.status)}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
@@ -343,7 +347,6 @@ const CustomerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Image preview modal */}
       {selectedImage && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/80 backdrop-blur-sm p-4 transition-opacity"
@@ -384,7 +387,6 @@ const CustomerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Payment upload modal */}
       {isPaymentModalOpen && paymentParcelId && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/80 backdrop-blur-sm p-4 transition-opacity"
@@ -396,6 +398,15 @@ const CustomerDashboard: React.FC = () => {
           >
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-brand-900">Upload Payment Receipt</h3>
+              <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
+        <h4 className="font-bold text-blue-900 mb-2">Company Bank Details</h4>
+        <p className="text-sm text-blue-800">Please transfer your shipping cost to the following account:</p>
+        <ul className="text-sm text-blue-900 mt-2 space-y-1 font-medium">
+          <li>Bank: <span className="font-bold">Meezan Bank</span></li>
+          <li>Account Title: <span className="font-bold">FastTrack Logistics</span></li>
+          <li>Account No: <span className="font-bold">0123456789012</span></li>
+        </ul>
+      </div>
               <button
                 onClick={() => setIsPaymentModalOpen(false)}
                 className="text-gray-500 hover:text-red-500 transition-colors p-1"

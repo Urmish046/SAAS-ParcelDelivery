@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Unique } from 'typeorm';
 import { Company } from './company.model';
+import { Warehouse } from './warehouse.model';
 
 @Entity('customers')
 @Unique(['companyId', 'email'])
@@ -24,6 +25,13 @@ export class Customer {
 
   @Column()
   companyId!: string;
+
+  @Column({ nullable: true }) // Nullable rakhein in case koi purana customer bina warehouse ke ho
+  destinationWarehouseId!: string;
+
+  @ManyToOne(() => Warehouse, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'destinationWarehouseId' })
+  destinationWarehouse!: Warehouse;
 
   @ManyToOne(() => Company, (company) => company.customers, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'companyId' })

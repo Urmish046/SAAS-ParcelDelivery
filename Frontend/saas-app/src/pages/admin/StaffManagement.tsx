@@ -88,9 +88,17 @@ const StaffManagement: React.FC = () => {
                 <tr key={staff.id} className="transition-colors hover:bg-brand-100/20">
                   <td className="px-6 py-4 text-sm font-medium text-brand-900">{staff.name}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">{staff.email}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {staff.warehouse?.name || 'Unassigned'}
-                  </td>
+                 <td className="px-6 py-4 text-sm">
+  {staff.warehouse?.name ? (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-100 text-brand-900">
+      {staff.warehouse.name}
+    </span>
+  ) : (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+      Unassigned
+    </span>
+  )}
+</td>
                   <td className="px-6 py-4 text-sm font-medium text-right">
                     <button
                       onClick={() => handleDelete(staff.id)}

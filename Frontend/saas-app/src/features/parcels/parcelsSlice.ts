@@ -4,18 +4,22 @@ import api from '../../api/axiosConfig';
 export interface Parcel {
   id: string;
   internalTrackingId: string;
+  originalTrackingNumber: string;
   customerTrackingId?: string;
   description: string;
   weight: number;
   dimensions: string;
   status: string;
   customerId: string;
-  warehouseId: string;
+  originWarehouseId: string;
+  destinationWarehouseId: string;
   createdAt: string;
   shippingCost?: number; 
   customer?: { name: string; email: string };
-  warehouse?: { name: string };
+  originWarehouse?: { id: string; name: string }; // Added id property
+  destinationWarehouse?: { id: string; name: string }; // Added id property
   paymentReceiptUrl?: string;
+  isCustomerConfirmed?: boolean;
 }
 
 interface ParcelsState {
@@ -42,27 +46,27 @@ export const fetchParcels = createAsyncThunk(
   }
 );
 
-export const createParcel = createAsyncThunk(
-  'parcels/createParcel',
-  async (parcelData: any, { rejectWithValue }) => {
+export const scanBarcode = createAsyncThunk(
+  'parcels/scanBarcode',
+  async (trackingNumber: string, { rejectWithValue }) => {
     try {
-      const response = await api.post('/parcels', parcelData);
+      const response = await api.post('/parcels/scan', { trackingNumber });
       return response.data;
     } catch (error: any) {
       const msg = error.response?.data?.message;
-      return rejectWithValue(Array.isArray(msg) ? msg.join(' | ') : (msg || 'Failed to create parcel'));
+      return rejectWithValue(Array.isArray(msg) ? msg.join(' | ') : (msg || 'Failed to scan parcel'));
     }
   }
 );
 
-export const claimParcel = createAsyncThunk(
-  'parcels/claimParcel',
-  async (internalTrackingId: string, { rejectWithValue }) => {
+export const createPreAlert = createAsyncThunk(
+  'parcels/createPreAlert',
+  async (trackingNumber: string, { rejectWithValue }) => {
     try {
-      const response = await api.post('/parcels/claim', { internalTrackingId });
+      const response = await api.post('/parcels/pre-alert', { trackingNumber });
       return response.data; 
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to track/claim parcel');
+      return rejectWithValue(error.response?.data?.message || 'Failed to add tracking number');
     }
   }
 );
@@ -124,10 +128,13 @@ const parcelsSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload as string;
       })
-      .addCase(createParcel.fulfilled, (state, action) => {
-        state.parcelsList.unshift(action.payload); 
+      .addCase(scanBarcode.fulfilled, (state, action) => {
+        const exists = state.parcelsList.find(p => p.id === action.payload.id);
+        if (!exists) {
+          state.parcelsList.unshift(action.payload); 
+        }
       })
-      .addCase(claimParcel.fulfilled, (state, action) => {
+      .addCase(createPreAlert.fulfilled, (state, action) => {
         state.parcelsList.unshift(action.payload);
       })
       .addCase(updateParcelStatus.pending, (state) => {

@@ -30,8 +30,13 @@ export class Warehouse {
   @UpdateDateColumn()
   updatedAt!: Date;
 
-  @OneToMany(() => Parcel, (parcel) => parcel.warehouse)
-  parcels!: Parcel[];
+
+  @OneToMany(() => Parcel, (parcel) => parcel.originWarehouse)
+  originParcels!: Parcel[];
+
+  @OneToMany(() => Parcel, (parcel) => parcel.destinationWarehouse)
+  destinationParcels!: Parcel[];
+
 
   @OneToMany(() => User, (user) => user.warehouse)
   staff!: User[];

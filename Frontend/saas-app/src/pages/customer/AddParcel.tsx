@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { claimParcel } from '../../features/parcels/parcelsSlice';
+import { createPreAlert } from '../../features/parcels/parcelsSlice';
 
 const AddParcel: React.FC = () => {
   const [trackingNumber, setTrackingNumber] = useState('');
@@ -15,8 +15,7 @@ const AddParcel: React.FC = () => {
 
     try {
       // Naya Redux action call kar rahe hain
-      await dispatch(claimParcel(trackingNumber)).unwrap();
-      
+await dispatch(createPreAlert(trackingNumber));      
       setStatusMsg({ 
         type: 'success', 
         text: 'Parcel added to your tracking list successfully!' 

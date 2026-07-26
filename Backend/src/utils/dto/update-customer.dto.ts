@@ -13,6 +13,10 @@ export class UpdateCustomerDto {
   @IsOptional()
   @MinLength(6)
   password?: string;
+  
+  @IsOptional()
+  @IsString()
+  destinationWarehouseId?: string;
 
   @IsString()
   @IsOptional()

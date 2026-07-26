@@ -1,7 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, UseGuards } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ParcelService } from './parcel.service';
-import { CreateParcelDto } from '../../utils/dto/create-parcel.dto';
 import { UpdateParcelStatusDto } from '../../utils/dto/update-parcel-status.dto';
 import { Roles } from '../../decorators/roles.decorator';
 import { CurrentUser } from '../../decorators/current-user.decorator';
@@ -13,23 +12,30 @@ import { RolesGuard } from '../../guards/roles.guard';
 export class ParcelController {
   constructor(private readonly parcelService: ParcelService) {}
 
-  // Only Staff/Admins can create a physical parcel now
-  @Post()
-  @Roles('company_admin', 'warehouse_staff')
-  create(@Body() createParcelDto: CreateParcelDto, @CurrentUser() user: any) {
-    return this.parcelService.create(createParcelDto, user.companyId, user);
+  // 🔥 CUSTOMER ENDPOINT: Customer apna tracking number add karega (Pre-alert)
+  @Post('pre-alert')
+  @Roles('customer')
+  createPreAlert(
+    @Body('trackingNumber') trackingNumber: string,
+    @CurrentUser() user: any
+  ) {
+    if (!trackingNumber) {
+      throw new BadRequestException('Tracking number is required.');
+    }
+    return this.parcelService.createPreAlert(trackingNumber, user.companyId, user);
   }
 
-  @Post('claim')
-  @Roles('customer')
-  claimParcel(@Body('internalTrackingId') internalTrackingId: string, @CurrentUser() user: any) {
-    
-    // Safety check: Agar ID khali aati hai toh yahin se error throw kar dein
-    if (!internalTrackingId) {
-      throw new BadRequestException('Please provide a valid tracking ID.');
+  // 🔥 STAFF & ADMIN ENDPOINT: Warehouse mein scan hoga
+  @Post('scan')
+  @Roles('warehouse_staff', 'company_admin') // Admin bhi scan kar sakega
+  async scanBarcode(
+    @Body('trackingNumber') trackingNumber: string, 
+    @CurrentUser() user: any
+  ) {
+    if (!trackingNumber) {
+      throw new BadRequestException('Tracking number is required for scanning.');
     }
-
-    return this.parcelService.claimParcel(internalTrackingId, user.companyId, user);
+    return this.parcelService.scanAndReceiveParcel(trackingNumber, user.companyId, user);
   }
 
   @Post(':id/upload-payment')

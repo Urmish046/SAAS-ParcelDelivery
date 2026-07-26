@@ -7,9 +7,11 @@ import { ParcelStatusHistory } from '../../models/parcel-status-history.model';
 import { StorageModule } from '../../storage/storage.module';
 import { EmailModule } from '../../email/email.module';
 import { PricingModule } from '../../pricing/pricing.module';
+import { TrackingRequest } from '../../models/tracking-request.model';
+import { Customer } from '../../models/customer.model';
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Parcel, ParcelStatusHistory]),
+    TypeOrmModule.forFeature([Parcel, ParcelStatusHistory, TrackingRequest, Customer]),
     StorageModule,
     EmailModule,
     PricingModule
