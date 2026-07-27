@@ -7,12 +7,10 @@ const WarehousesManagement: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { warehouses, status, error } = useSelector((state: RootState) => state.warehouses);
 
-  // Create Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
 
-  // Edit Modal States
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -61,8 +59,7 @@ const WarehousesManagement: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 relative">
-      
-      {/* HEADER SECTION */}
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-brand-900">Warehouses</h2>
@@ -82,7 +79,6 @@ const WarehousesManagement: React.FC = () => {
         </div>
       )}
 
-      {/* TABLE SECTION */}
       <div className="bg-white border rounded-xl shadow-sm border-brand-300 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-brand-100">
@@ -129,7 +125,6 @@ const WarehousesManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* CREATE MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 backdrop-blur-sm transition-opacity">
           <div className="w-full max-w-md p-7 bg-white shadow-2xl rounded-2xl border border-brand-100">
@@ -177,7 +172,6 @@ const WarehousesManagement: React.FC = () => {
         </div>
       )}
 
-      {/* EDIT MODAL */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 backdrop-blur-sm transition-opacity">
           <div className="w-full max-w-md p-7 bg-white shadow-2xl rounded-2xl border border-brand-100">

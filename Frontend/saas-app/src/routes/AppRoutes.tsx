@@ -15,8 +15,6 @@ import ParcelsManagement from '../pages/admin/ParcelsManagement';
 import SuperAdminDashboard from '../pages/super-admin/SuperAdminDashboard';
 import AddParcel from '../pages/customer/AddParcel';
 import MyParcels from '../pages/customer/MyParcels';
-
-// Customer Portal Imports
 import CustomerLoginPage from '../pages/auth/CustomerLoginPage';
 import CustomerLayout from '../components/layout/CustomerLayout';
 import CustomerDashboard from '../pages/customer/CustomerDashboard';
@@ -58,7 +56,6 @@ const AppRoutes: React.FC = () => {
           <Route path="companies" element={<CompaniesList />} />
         </Route>
 
-        {/* Customer Portal Routes */}
         <Route path="/customer/login" element={<CustomerLoginPage />} />
         
         <Route 

@@ -26,7 +26,7 @@ export class Customer {
   @Column()
   companyId!: string;
 
-  @Column({ nullable: true }) // Nullable rakhein in case koi purana customer bina warehouse ke ho
+  @Column({ nullable: true }) 
   destinationWarehouseId!: string;
 
   @ManyToOne(() => Warehouse, { onDelete: 'SET NULL' })

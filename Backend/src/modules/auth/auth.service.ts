@@ -93,7 +93,6 @@ export class AuthService {
   }
 
 async customerLogin(email: string, pass: string) {
-    // Sirf email se search kar rahe hain
     const customer = await this.customerRepository.findOne({
       where: { email },
     });
@@ -112,6 +111,7 @@ async customerLogin(email: string, pass: string) {
       email: customer.email,
       role: 'customer',
       companyId: customer.companyId,
+      
     };
 
     return {

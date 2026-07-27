@@ -28,12 +28,11 @@ const MyParcels: React.FC = () => {
   const fetchMyParcels = async () => {
     try {
       const { data } = await api.get('/parcels/my-parcels');
-      
-      // ✨ NEW: Filter out active parcels. Only keep 'completed' or 'returned'
+
       const historyParcels = data.filter((parcel: Parcel) => 
         ['completed', 'returned'].includes(parcel.status.toLowerCase())
       );
-      
+
       setParcels(historyParcels);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load shipment history.');
@@ -49,13 +48,13 @@ const MyParcels: React.FC = () => {
   useEffect(() => {
     if (selectedImage) {
       setImgError(false);
-      console.log("📸 BROWSER IS TRYING TO LOAD THIS URL:", selectedImage); 
+      console.log("BROWSER IS TRYING TO LOAD THIS URL:", selectedImage); 
     }
   }, [selectedImage]);
 
   const handleConfirmShipment = async (parcelId: string) => {
     if (!window.confirm("Are you sure you want to confirm this shipment for dispatch?")) return;
-    
+
     try {
       await api.patch(`/parcels/${parcelId}/confirm`);
       fetchMyParcels(); 
@@ -92,7 +91,7 @@ const MyParcels: React.FC = () => {
       await api.post(`/parcels/${paymentParcelId}/upload-payment`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      
+
       alert("Payment receipt uploaded successfully! Your parcel is now Completed.");
       setIsPaymentModalOpen(false);
       setPaymentParcelId(null);
@@ -207,7 +206,6 @@ const MyParcels: React.FC = () => {
         </div>
       )}
 
-      {/* Image Modal */}
       {selectedImage && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/80 backdrop-blur-sm p-4 transition-opacity"

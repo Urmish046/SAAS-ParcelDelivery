@@ -303,7 +303,7 @@ const CustomerDashboard: React.FC = () => {
                             onClick={() => handleViewImage(parcel)}
                             className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-600 hover:text-brand-900 transition-colors bg-brand-50 hover:bg-brand-100 px-2 py-1 rounded-md border border-brand-200"
                           >
-                            <span>📷</span> View Image
+                            <span></span> View Image
                           </button>
                         )}
                       </td>
@@ -314,13 +314,22 @@ const CustomerDashboard: React.FC = () => {
                         {parcel.shippingCost ? `$${parcel.shippingCost}` : 'Pending'}
                       </td>
                       <td className="px-6 py-4 text-right space-x-3">
-                        {parcel.status.toLowerCase() === 'scanned' && (
+
+                        {parcel.status.toLowerCase() === 'scanned' && !parcel.isCustomerConfirmed && (
                           <button
                             onClick={() => handleConfirmShipment(parcel.id)}
                             className="px-4 py-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-lg shadow-sm transition-all"
                           >
                             Confirm
                           </button>
+                        )}
+
+                        {parcel.status.toLowerCase() === 'scanned' && parcel.isCustomerConfirmed && (
+                          <div className="inline-flex flex-col items-end">
+                            <span className="px-3 py-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm text-right">
+                              Confirmation sent. If approved, the shipment will proceed.
+                            </span>
+                          </div>
                         )}
 
                         {parcel.status.toLowerCase() === 'available_for_pickup' && (
@@ -398,15 +407,6 @@ const CustomerDashboard: React.FC = () => {
           >
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-brand-900">Upload Payment Receipt</h3>
-              <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
-        <h4 className="font-bold text-blue-900 mb-2">Company Bank Details</h4>
-        <p className="text-sm text-blue-800">Please transfer your shipping cost to the following account:</p>
-        <ul className="text-sm text-blue-900 mt-2 space-y-1 font-medium">
-          <li>Bank: <span className="font-bold">Meezan Bank</span></li>
-          <li>Account Title: <span className="font-bold">FastTrack Logistics</span></li>
-          <li>Account No: <span className="font-bold">0123456789012</span></li>
-        </ul>
-      </div>
               <button
                 onClick={() => setIsPaymentModalOpen(false)}
                 className="text-gray-500 hover:text-red-500 transition-colors p-1"

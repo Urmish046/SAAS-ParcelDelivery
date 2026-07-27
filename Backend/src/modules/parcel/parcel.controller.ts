@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Injectable, ExecutionContext } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ParcelService } from './parcel.service';
 import { UpdateParcelStatusDto } from '../../utils/dto/update-parcel-status.dto';
@@ -12,7 +12,6 @@ import { RolesGuard } from '../../guards/roles.guard';
 export class ParcelController {
   constructor(private readonly parcelService: ParcelService) {}
 
-  // 🔥 CUSTOMER ENDPOINT: Customer apna tracking number add karega (Pre-alert)
   @Post('pre-alert')
   @Roles('customer')
   createPreAlert(
@@ -25,9 +24,8 @@ export class ParcelController {
     return this.parcelService.createPreAlert(trackingNumber, user.companyId, user);
   }
 
-  // 🔥 STAFF & ADMIN ENDPOINT: Warehouse mein scan hoga
   @Post('scan')
-  @Roles('warehouse_staff', 'company_admin') // Admin bhi scan kar sakega
+  @Roles('warehouse_staff', 'company_admin') 
   async scanBarcode(
     @Body('trackingNumber') trackingNumber: string, 
     @CurrentUser() user: any
@@ -74,7 +72,6 @@ export class ParcelController {
     return this.parcelService.findOne(id, user.companyId, user);
   }
 
-  // Staff Update Status
   @Patch(':id/status')
   @Roles('company_admin', 'warehouse_staff')
   updateStatus(
@@ -85,7 +82,6 @@ export class ParcelController {
     return this.parcelService.updateStatus(id, updateParcelStatusDto, user.companyId, user);
   }
 
-  // Customer Confirm Shipment
   @Patch(':id/confirm')
   @Roles('customer')
   confirmShipment(@Param('id') id: string, @CurrentUser() user: any) {

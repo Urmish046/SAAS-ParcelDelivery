@@ -8,8 +8,7 @@ api.interceptors.request.use(
   (config) => {
     const pathname = window.location.pathname;
     
-    // Path ke hisaab se sahi token key decide karein
-    let tokenKey = 'admin_token'; // Default fallback
+    let tokenKey = 'admin_token'; 
     
     if (pathname.startsWith('/super-admin')) {
       tokenKey = 'super_admin_token';

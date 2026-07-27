@@ -42,4 +42,16 @@ export class CompanyController {
   remove(@Param('id') id: string) {
     return this.companyService.remove(id); 
   }
+
+  @Patch(':id/activate')
+  @Roles('super_admin') 
+  activateSubscription(@Param('id') id: string) {
+    return this.companyService.activateSubscription(id);
+  }
+
+  @Patch(':id/suspend')
+  @Roles('super_admin')
+  suspendCompany(@Param('id') id: string) {
+    return this.companyService.suspendCompany(id);
+  }
 }

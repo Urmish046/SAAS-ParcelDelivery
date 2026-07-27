@@ -14,7 +14,6 @@ const AddParcel: React.FC = () => {
     setStatusMsg({ type: '', text: '' });
 
     try {
-      // Naya Redux action call kar rahe hain
 await dispatch(createPreAlert(trackingNumber));      
       setStatusMsg({ 
         type: 'success', 

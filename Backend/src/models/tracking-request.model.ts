@@ -13,11 +13,9 @@ export class TrackingRequest {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  // Customer jo tracking ID enter karega
   @Column()
   trackingNumber!: string;
 
-  // Jab staff scan kar lega toh yeh MATCHED ho jayega
   @Column({ type: 'enum', enum: TrackingRequestStatus, default: TrackingRequestStatus.PENDING })
   status!: TrackingRequestStatus;
 

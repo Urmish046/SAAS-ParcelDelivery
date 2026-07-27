@@ -9,8 +9,7 @@ const CompanyAdminLayout: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((state: RootState) => state.auth);
-  
-  // 🔥 Mobile menu toggle state
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
@@ -44,8 +43,7 @@ const CompanyAdminLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-brand-50 overflow-hidden">
-      
-      {/* 🔥 Mobile Overlay Backdrop */}
+
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 z-40 bg-brand-900/40 backdrop-blur-sm md:hidden transition-opacity"
@@ -53,7 +51,6 @@ const CompanyAdminLayout: React.FC = () => {
         />
       )}
 
-      {/* Sidebar - Made responsive (Fixed on mobile, static on desktop) */}
       <aside 
         className={`fixed inset-y-0 left-0 z-50 w-64 bg-brand-900 text-white flex flex-col shadow-xl transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
@@ -63,7 +60,6 @@ const CompanyAdminLayout: React.FC = () => {
           <h1 className="text-xl font-bold tracking-widest text-brand-100 truncate">
             {currentRole === 'warehouse_staff' ? 'STAFF PORTAL' : 'ADMIN PORTAL'}
           </h1>
-          {/* Close button for mobile */}
           <button 
             onClick={() => setIsMobileMenuOpen(false)}
             className="md:hidden p-1 text-brand-300 hover:text-white transition-colors"
@@ -78,7 +74,7 @@ const CompanyAdminLayout: React.FC = () => {
               key={item.path}
               to={item.path}
               end={item.exact}
-              onClick={() => setIsMobileMenuOpen(false)} // Close menu on mobile when a link is clicked
+              onClick={() => setIsMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `flex items-center px-6 py-3.5 text-sm font-medium transition-all duration-200 ${
                   isActive
@@ -107,10 +103,8 @@ const CompanyAdminLayout: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        
-        {/* 🔥 Mobile Top Header */}
+
         <header className="md:hidden flex items-center justify-between bg-white border-b border-brand-200 h-16 px-4 shrink-0 shadow-sm z-30">
           <div className="flex items-center gap-3">
             <button 
@@ -125,14 +119,13 @@ const CompanyAdminLayout: React.FC = () => {
           </div>
         </header>
 
-        {/* Scrollable Main Content */}
         <main className="flex-1 overflow-auto">
           <div className="p-4 sm:p-6 md:p-8">
             <Outlet />
           </div>
         </main>
       </div>
-      
+
     </div>
   );
 };

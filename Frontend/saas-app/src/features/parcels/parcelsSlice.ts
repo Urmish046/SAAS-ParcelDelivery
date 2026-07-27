@@ -16,8 +16,8 @@ export interface Parcel {
   createdAt: string;
   shippingCost?: number; 
   customer?: { name: string; email: string };
-  originWarehouse?: { id: string; name: string }; // Added id property
-  destinationWarehouse?: { id: string; name: string }; // Added id property
+  originWarehouse?: { id: string; name: string }; 
+  destinationWarehouse?: { id: string; name: string }; 
   paymentReceiptUrl?: string;
   isCustomerConfirmed?: boolean;
 }

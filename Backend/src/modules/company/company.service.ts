@@ -29,20 +29,21 @@ export class CompanyService {
     }
   }
 
-  async create(createCompanyDto: CreateCompanyDto) {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+ async create(createCompanyDto: CreateCompanyDto) {
+  const queryRunner = this.dataSource.createQueryRunner();
+  await queryRunner.connect();
+  await queryRunner.startTransaction();
 
-    try {
-      const newCompany = queryRunner.manager.create(Company, {
-        name: createCompanyDto.name,
-        subdomain: createCompanyDto.subdomain,
-        country: createCompanyDto.country,
-        status: 'ACTIVE',
-      });
-      const savedCompany = await queryRunner.manager.save(newCompany);
-
+  try {
+    const newCompany = queryRunner.manager.create(Company, {
+      name: createCompanyDto.name,
+      subdomain: createCompanyDto.subdomain,
+      country: createCompanyDto.country,
+      status: 'ACTIVE',
+      planId: createCompanyDto.planId,          
+      subscriptionStatus: createCompanyDto.planId ? 'active' : 'trial', 
+    });
+    const savedCompany = await queryRunner.manager.save(newCompany);
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(createCompanyDto.password, saltRounds);
 
@@ -149,6 +150,22 @@ export class CompanyService {
       ...updatedCompany,
       adminEmail: adminForCompany ? adminForCompany.email : 'N/A',
     };
+  }
+
+  async activateSubscription(companyId: string) {
+    const company = await this.companyRepository.findOne({ where: { id: companyId } });
+    if (!company) throw new NotFoundException('Company not found');
+    
+    company.subscriptionStatus = 'active';
+    return await this.companyRepository.save(company);
+  }
+
+  async suspendCompany(companyId: string) {
+    const company = await this.companyRepository.findOne({ where: { id: companyId } });
+    if (!company) throw new NotFoundException('Company not found');
+    
+    company.subscriptionStatus = 'suspended';
+    return await this.companyRepository.save(company);
   }
 
   async remove(id: string) {

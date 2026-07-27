@@ -1,17 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchCustomers, createCustomer, updateCustomer, deleteCustomer } from '../../features/customers/customersSlice';
-// 🔥 Apna sahi path yahan zaroor verify kar lein
 import { fetchWarehouses } from '../../features/warehouses/warehousesSlice'; 
 import type { AppDispatch, RootState } from '../../store/store';
 
 const CustomersManagement: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  
-  // Destructure customers state
+
   const { customersList, status: customerStatus, error } = useSelector((state: RootState) => state.customers);
-  
-  // 🔥 Fetch warehouses state exactly from your provided slice
+
   const { warehouses } = useSelector((state: RootState) => state.warehouses);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,7 +17,7 @@ const CustomersManagement: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [address, setAddress] = useState('');
-  const [destinationWarehouseId, setDestinationWarehouseId] = useState(''); // State for new customer warehouse
+  const [destinationWarehouseId, setDestinationWarehouseId] = useState('');
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -29,13 +26,12 @@ const CustomersManagement: React.FC = () => {
   const [editPhone, setEditPhone] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editPassword, setEditPassword] = useState('');
-  const [editDestinationWarehouseId, setEditDestinationWarehouseId] = useState(''); // State for edit customer warehouse
+  const [editDestinationWarehouseId, setEditDestinationWarehouseId] = useState('');
 
   useEffect(() => {
     if (customerStatus === 'idle') {
       dispatch(fetchCustomers());
     }
-    // 🔥 Fetch warehouses so the dropdown has data when modal opens
     if (warehouses.length === 0) {
       dispatch(fetchWarehouses());
     }
@@ -220,7 +216,6 @@ const CustomersManagement: React.FC = () => {
                 />
               </div>
               
-              {/* 🔥 Updated Dropdown exactly per your slice data */}
               <div>
                 <label className="block mb-1.5 text-sm font-medium text-brand-900">
                   Destination Warehouse <span className="text-red-500">*</span>
@@ -317,7 +312,6 @@ const CustomersManagement: React.FC = () => {
                 />
               </div>
 
-              {/* 🔥 Updated Dropdown exactly per your slice data */}
               <div>
                 <label className="block mb-1.5 text-sm font-medium text-brand-900">
                   Destination Warehouse <span className="text-red-500">*</span>

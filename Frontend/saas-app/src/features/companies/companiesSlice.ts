@@ -1,30 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../../api/axiosConfig';
 
-export const updateCompany = createAsyncThunk(
-  'companies/updateCompany',
-  async ({ id, data }: { id: string; data: any }, { rejectWithValue }) => {
-    try {
-      const response = await api.patch(`/company/${id}`, data);
-      return response.data;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to update company');
-    }
-  }
-);
-
-export const toggleCompanyStatus = createAsyncThunk(
-  'companies/toggleCompanyStatus',
-  async ({ id, status }: { id: string; status: string }, { rejectWithValue }) => {
-    try {
-      const response = await api.patch(`/company/${id}`, { status });
-      return response.data;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to update status');
-    }
-  }
-);
-
 export const fetchCompanies = createAsyncThunk(
   'companies/fetchCompanies',
   async (_, { rejectWithValue }) => {
@@ -45,6 +21,42 @@ export const createCompany = createAsyncThunk(
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to create company');
+    }
+  }
+);
+
+export const updateCompany = createAsyncThunk(
+  'companies/updateCompany',
+  async ({ id, data }: { id: string; data: any }, { rejectWithValue }) => {
+    try {
+      const response = await api.patch(`/company/${id}`, data);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to update company');
+    }
+  }
+);
+
+export const activateCompany = createAsyncThunk(
+  'companies/activateCompany',
+  async (id: string, { rejectWithValue }) => {
+    try {
+      const response = await api.patch(`/company/${id}/activate`);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to activate company');
+    }
+  }
+);
+
+export const suspendCompany = createAsyncThunk(
+  'companies/suspendCompany',
+  async (id: string, { rejectWithValue }) => {
+    try {
+      const response = await api.patch(`/company/${id}/suspend`);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to suspend company');
     }
   }
 );
@@ -95,7 +107,11 @@ const companiesSlice = createSlice({
         const index = state.companies.findIndex((c) => c.id === action.payload.id);
         if (index !== -1) state.companies[index] = action.payload;
       })
-      .addCase(toggleCompanyStatus.fulfilled, (state, action) => {
+      .addCase(activateCompany.fulfilled, (state, action) => {
+        const index = state.companies.findIndex((c) => c.id === action.payload.id);
+        if (index !== -1) state.companies[index] = action.payload;
+      })
+      .addCase(suspendCompany.fulfilled, (state, action) => {
         const index = state.companies.findIndex((c) => c.id === action.payload.id);
         if (index !== -1) state.companies[index] = action.payload;
       });

@@ -11,33 +11,31 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TrackingRequest, TrackingRequestStatus } from '../../models/tracking-request.model';
 import { Customer } from '../../models/customer.model';
 
-// Har transition k liye decide karta hai k ye ORIGIN warehouse ka kaam hai ya DESTINATION ka.
-// null matlab: koi warehouse-specific restriction nahi (sirf company_admin ya customer side).
 type WarehouseRole = 'origin' | 'destination' | null;
 
 const TRANSITION_OWNER: Record<string, Record<string, WarehouseRole>> = {
   [ParcelStatus.PENDING]: {
-    [ParcelStatus.SCANNED]: 'origin',     // receive + scan + weight + price
+    [ParcelStatus.SCANNED]: 'origin',
     [ParcelStatus.RETURNED]: 'origin',
   },
   [ParcelStatus.SCANNED]: {
-    [ParcelStatus.SHIPPED]: 'origin',     // origin dispatch karta hai
+    [ParcelStatus.SHIPPED]: 'origin',
     [ParcelStatus.RETURNED]: 'origin',
   },
   [ParcelStatus.SHIPPED]: {
-    [ParcelStatus.AVAILABLE_FOR_PICKUP]: 'destination', // receive shipment + mark available
+    [ParcelStatus.AVAILABLE_FOR_PICKUP]: 'destination',
     [ParcelStatus.RETURNED]: 'destination',
   },
   [ParcelStatus.AVAILABLE_FOR_PICKUP]: {
-    [ParcelStatus.COMPLETED]: 'destination', // collect payment + mark completed
+    [ParcelStatus.COMPLETED]: 'destination',
     [ParcelStatus.RETURNED]: 'destination',
   },
   [ParcelStatus.PAYMENT_UNDER_REVIEW]: {
     [ParcelStatus.COMPLETED]: 'destination',
-    [ParcelStatus.AVAILABLE_FOR_PICKUP]: 'destination', // payment reject -> wapis pickup pe
+    [ParcelStatus.AVAILABLE_FOR_PICKUP]: 'destination',
   },
   [ParcelStatus.RETURNED]: {
-    [ParcelStatus.PENDING]: 'origin', // re-intake
+    [ParcelStatus.PENDING]: 'origin',
   },
 };
 
@@ -48,12 +46,10 @@ export class ParcelService {
     private parcelRepository: Repository<Parcel>,
     @InjectRepository(ParcelStatusHistory)
     private historyRepository: Repository<ParcelStatusHistory>,
-    
     @InjectRepository(TrackingRequest)
-    private trackingRequestRepo: Repository<TrackingRequest>, // 🔥 YEH ADD KIYA HAI
+    private trackingRequestRepo: Repository<TrackingRequest>,
     @InjectRepository(Customer)
-private customerRepo: Repository<Customer>,
-    
+    private customerRepo: Repository<Customer>,
     @Inject(STORAGE_SERVICE)
     private readonly storageService: IStorageService,
     private readonly emailService: EmailService,
@@ -63,11 +59,11 @@ private customerRepo: Repository<Customer>,
 
   private async formatParcelWithSecureUrls(parcel: Parcel) {
     const parcelPayload = { ...parcel };
-    
+
     if (parcelPayload.imageUrls && parcelPayload.imageUrls.length > 0) {
       parcelPayload.imageUrls = await Promise.all(
         parcelPayload.imageUrls.map(async (img) => {
-          if (img.startsWith('http')) return img; 
+          if (img.startsWith('http')) return img;
           try {
             return await this.storageService.getFileUrl(img);
           } catch (error) {
@@ -81,15 +77,13 @@ private customerRepo: Repository<Customer>,
       try {
         parcelPayload.paymentReceiptUrl = await this.storageService.getFileUrl(parcelPayload.paymentReceiptUrl);
       } catch (error) {
-        console.error("Error generating receipt URL:", error);
+        console.error('Error generating receipt URL:', error);
       }
     }
 
     return parcelPayload;
   }
 
-  // Staff ke warehouseId ko required side (origin/destination) se match karta hai.
-  // company_admin har jagah allowed hai, is check ko skip karega.
   private assertWarehouseAuthority(parcel: Parcel, currentUser: any, requiredRole: WarehouseRole) {
     if (currentUser.role !== 'warehouse_staff' || requiredRole === null) return;
 
@@ -107,64 +101,59 @@ private customerRepo: Repository<Customer>,
     }
   }
 
-  // 🔥 CUSTOMER FUNCTION: Tracking Request Create Karna
-async createPreAlert(trackingNumber: string, companyId: string, currentUser: any) {
-  if (currentUser.role !== 'customer') {
-    throw new ForbiddenException('Only customers can register tracking numbers.');
+  async createPreAlert(trackingNumber: string, companyId: string, currentUser: any) {
+    if (currentUser.role !== 'customer') {
+      throw new ForbiddenException('Only customers can register tracking numbers.');
+    }
+
+    const existingRequest = await this.trackingRequestRepo.findOne({
+      where: { trackingNumber, companyId }
+    });
+
+    if (existingRequest) {
+      throw new ConflictException('This tracking number is already registered in the system.');
+    }
+
+    const customer = await this.customerRepo.findOne({
+      where: { id: currentUser.userId, companyId }
+    });
+
+    if (!customer || !customer.destinationWarehouseId) {
+      throw new BadRequestException('Your profile is missing a default destination warehouse. Please contact support.');
+    }
+
+    const newRequest = this.trackingRequestRepo.create({
+      trackingNumber,
+      companyId,
+      customerId: currentUser.userId,
+      destinationWarehouseId: customer.destinationWarehouseId,
+    });
+
+    return await this.trackingRequestRepo.save(newRequest);
   }
-
-  // Check karein ke kahin yeh tracking number pehle se toh register nahi ho chuka
-  const existingRequest = await this.trackingRequestRepo.findOne({
-    where: { trackingNumber, companyId }
-  });
-
-  if (existingRequest) {
-    throw new ConflictException('This tracking number is already registered in the system.');
-  }
-
-  // 🔥 NAYA CODE: Customer ko database se fetch karein taake uska default destination mil jaye
-  const customer = await this.customerRepo.findOne({
-    where: { id: currentUser.userId, companyId }
-  });
-
-  if (!customer || !customer.destinationWarehouseId) {
-    throw new BadRequestException('Your profile is missing a default destination warehouse. Please contact support.');
-  }
-
-  // Nayi request banayen aur save karein
-  const newRequest = this.trackingRequestRepo.create({
-    trackingNumber,
-    companyId,
-    customerId: currentUser.userId,
-    destinationWarehouseId: customer.destinationWarehouseId, // 🔥 Customer ka default warehouse assign ho gaya
-    // status 'PENDING' automatically database model se lag jayega
-  });
-
-  return await this.trackingRequestRepo.save(newRequest);
-}
 
   async getCustomerStats(companyId: string, userId: string) {
     const activeShipments = await this.parcelRepository.count({
-      where: { 
-        companyId, 
-        customerId: userId, 
-        status: In([ParcelStatus.PENDING, ParcelStatus.SCANNED, ParcelStatus.SHIPPED]) 
+      where: {
+        companyId,
+        customerId: userId,
+        status: In([ParcelStatus.PENDING, ParcelStatus.SCANNED, ParcelStatus.SHIPPED])
       }
     });
 
     const actionRequired = await this.parcelRepository.count({
-      where: { 
-        companyId, 
-        customerId: userId, 
-        status: ParcelStatus.SCANNED 
+      where: {
+        companyId,
+        customerId: userId,
+        status: ParcelStatus.SCANNED
       }
     });
 
     const readyForPickup = await this.parcelRepository.count({
-      where: { 
-        companyId, 
-        customerId: userId, 
-        status: ParcelStatus.AVAILABLE_FOR_PICKUP 
+      where: {
+        companyId,
+        customerId: userId,
+        status: ParcelStatus.AVAILABLE_FOR_PICKUP
       }
     });
 
@@ -173,12 +162,12 @@ async createPreAlert(trackingNumber: string, companyId: string, currentUser: any
 
   async uploadPaymentReceipt(id: string, file: Express.Multer.File, companyId: string, currentUser: any) {
     const parcel = await this.findOne(id, companyId, currentUser);
-    
+
     const fileName = await this.storageService.uploadFile(file, `payments/${companyId}`);
-    
-    parcel.status = ParcelStatus.PAYMENT_UNDER_REVIEW; 
-    parcel.paymentReceiptUrl = fileName; 
-    
+
+    parcel.status = ParcelStatus.PAYMENT_UNDER_REVIEW;
+    parcel.paymentReceiptUrl = fileName;
+
     await this.parcelRepository.save(parcel);
 
     await this.historyRepository.save(
@@ -190,81 +179,78 @@ async createPreAlert(trackingNumber: string, companyId: string, currentUser: any
       })
     );
 
-    return { receiptUrl: fileName, status: ParcelStatus.PAYMENT_UNDER_REVIEW }; 
+    return { receiptUrl: fileName, status: ParcelStatus.PAYMENT_UNDER_REVIEW };
   }
 
- // 🔥 THE MAGIC FUNCTION: STRICT SCAN LOGIC
-async scanAndReceiveParcel(trackingNumber: string, companyId: string, currentUser: any) {
-  if (currentUser.role !== 'warehouse_staff' || !currentUser.warehouseId) {
-    throw new ForbiddenException('Only assigned warehouse staff can scan and receive parcels.');
-  }
+  async scanAndReceiveParcel(trackingNumber: string, companyId: string, currentUser: any) {
+    if (currentUser.role !== 'warehouse_staff' || !currentUser.warehouseId) {
+      throw new ForbiddenException('Only assigned warehouse staff can scan and receive parcels.');
+    }
 
-  // Check agar parcel already scanned hai
-  const existingParcel = await this.parcelRepository.findOne({
-    where: { originalTrackingNumber: trackingNumber, companyId },
-    relations: ['originWarehouse', 'destinationWarehouse', 'customer'],
-  });
+    const existingParcel = await this.parcelRepository.findOne({
+      where: { originalTrackingNumber: trackingNumber, companyId },
+      relations: ['originWarehouse', 'destinationWarehouse', 'customer'],
+    });
 
-  if (existingParcel) {
-    return await this.formatParcelWithSecureUrls(existingParcel);
-  }
+    if (existingParcel) {
+      return await this.formatParcelWithSecureUrls(existingParcel);
+    }
 
-  // Guest List (TrackingRequest) mein dhundein
-  const trackingRequest = await this.trackingRequestRepo.findOne({
-    where: { trackingNumber, companyId }
-  });
+    const trackingRequest = await this.trackingRequestRepo.findOne({
+      where: { trackingNumber, companyId }
+    });
 
-  // ERROR: Agar customer ne request nahi banayi hui thi
-  if (!trackingRequest) {
-    throw new NotFoundException(
-      `Tracking ID "${trackingNumber}" not found! Customer has not registered this parcel.`
-    );
-  }
+    if (!trackingRequest) {
+      throw new NotFoundException(
+        `Tracking ID "${trackingNumber}" not found! Customer has not registered this parcel.`
+      );
+    }
 
-  // Match mil gaya, Naya Parcel Banayen
-  const internalTrackingId = `INT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-  const newParcel = this.parcelRepository.create({
-    originalTrackingNumber: trackingNumber,
-    internalTrackingId,
-    companyId,
-    description: 'Waiting for details update', 
-    originWarehouseId: currentUser.warehouseId,
-    customerId: trackingRequest.customerId, // Customer yahan automatically assign ho gaya
-    
-    // 🔥 NAYA CODE: Tracking request se customer ka destination automatically yahan copy ho jayega
-    destinationWarehouseId: trackingRequest.destinationWarehouseId, 
-    
-    status: ParcelStatus.SCANNED, 
-  });
+    if (currentUser.warehouseId === trackingRequest.destinationWarehouseId) {
+      throw new BadRequestException(
+        'Origin and Destination warehouses cannot be exactly the same! This warehouse is already set as the destination.'
+      );
+    }
 
-  const savedParcel = await this.parcelRepository.save(newParcel);
-
-  await this.historyRepository.save(
-    this.historyRepository.create({
-      parcelId: savedParcel.id,
+    const internalTrackingId = `INT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const newParcel = this.parcelRepository.create({
+      originalTrackingNumber: trackingNumber,
+      internalTrackingId,
+      companyId,
+      description: 'Waiting for details update',
+      originWarehouseId: currentUser.warehouseId,
+      customerId: trackingRequest.customerId,
+      destinationWarehouseId: trackingRequest.destinationWarehouseId,
       status: ParcelStatus.SCANNED,
-      changedById: currentUser.userId,
-      changedByType: 'user',
-    })
-  );
+    });
 
-  // Request ko MATCHED mark kar dein
-  trackingRequest.status = TrackingRequestStatus.MATCHED; 
-  await this.trackingRequestRepo.save(trackingRequest);
+    const savedParcel = await this.parcelRepository.save(newParcel);
 
-  const completeParcel = await this.parcelRepository.findOne({
-    where: { id: savedParcel.id },
-    relations: ['originWarehouse', 'destinationWarehouse', 'customer'],
-  });
+    await this.historyRepository.save(
+      this.historyRepository.create({
+        parcelId: savedParcel.id,
+        status: ParcelStatus.SCANNED,
+        changedById: currentUser.userId,
+        changedByType: 'user',
+      })
+    );
 
-  return await this.formatParcelWithSecureUrls(completeParcel!);
-}
+    trackingRequest.status = TrackingRequestStatus.MATCHED;
+    await this.trackingRequestRepo.save(trackingRequest);
+
+    const completeParcel = await this.parcelRepository.findOne({
+      where: { id: savedParcel.id },
+      relations: ['originWarehouse', 'destinationWarehouse', 'customer'],
+    });
+
+    return await this.formatParcelWithSecureUrls(completeParcel!);
+  }
 
   async claimParcel(trackingId: string, companyId: string, user: any) {
-    const parcel = await this.parcelRepository.findOne({ 
-      where: { 
-        internalTrackingId: trackingId, 
-        companyId: companyId 
+    const parcel = await this.parcelRepository.findOne({
+      where: {
+        internalTrackingId: trackingId,
+        companyId: companyId
       }
     });
 
@@ -308,9 +294,6 @@ async scanAndReceiveParcel(trackingNumber: string, companyId: string, currentUse
       if (!currentUser.warehouseId) {
         throw new ForbiddenException('You are not assigned to any warehouse.');
       }
-      // Staff ko apne origin AND destination dono role ke parcels dikhne chahiye —
-      // e.g. Nigeria staff ko wo parcels bhi dikhne chahiye jinke woh destination hain,
-      // chahe unka origin koi bhi warehouse ho. Isliye OR condition.
       const parcels = await this.parcelRepository.find({
         where: [
           { companyId, originWarehouseId: currentUser.warehouseId },
@@ -322,7 +305,6 @@ async scanAndReceiveParcel(trackingNumber: string, companyId: string, currentUse
       return Promise.all(parcels.map(parcel => this.formatParcelWithSecureUrls(parcel)));
     }
 
-    // company_admin — sab kuch
     const parcels = await this.parcelRepository.find({
       where: { companyId },
       relations: ['originWarehouse', 'destinationWarehouse', 'customer'],
@@ -389,7 +371,7 @@ async scanAndReceiveParcel(trackingNumber: string, companyId: string, currentUse
 
   async updateStatus(id: string, updateDto: UpdateParcelStatusDto, companyId: string, currentUser: any) {
     const parcel = await this.findOne(id, companyId, currentUser);
-    
+
     const originalStatus = parcel.status;
 
     if (updateDto.status === ParcelStatus.SHIPPED && !parcel.isCustomerConfirmed) {
@@ -402,7 +384,7 @@ async scanAndReceiveParcel(trackingNumber: string, companyId: string, currentUse
       [ParcelStatus.SHIPPED]: [ParcelStatus.AVAILABLE_FOR_PICKUP, ParcelStatus.RETURNED],
       [ParcelStatus.AVAILABLE_FOR_PICKUP]: [ParcelStatus.COMPLETED, ParcelStatus.RETURNED],
       [ParcelStatus.PAYMENT_UNDER_REVIEW]: [ParcelStatus.COMPLETED, ParcelStatus.AVAILABLE_FOR_PICKUP],
-      [ParcelStatus.COMPLETED]: [], 
+      [ParcelStatus.COMPLETED]: [],
       [ParcelStatus.RETURNED]: [ParcelStatus.PENDING]
     };
 
@@ -412,26 +394,24 @@ async scanAndReceiveParcel(trackingNumber: string, companyId: string, currentUse
         throw new BadRequestException(`Strict Flow: Aap '${originalStatus}' se directly '${updateDto.status}' nahi kar sakte.`);
       }
 
-      // NAYA CHECK: is transition ka authority origin warehouse ke paas hai ya destination ke?
       const requiredRole = TRANSITION_OWNER[originalStatus]?.[updateDto.status] ?? null;
       this.assertWarehouseAuthority(parcel, currentUser, requiredRole);
 
       parcel.status = updateDto.status as ParcelStatus;
     }
 
-    // weight/dimensions/shippingCost sirf origin warehouse staff (ya company_admin) set kar sakte hain —
-    // ye intake-stage data hai, destination ka isse lena dena nahi.
     const isEditingIntakeFields =
       updateDto.weight !== undefined || updateDto.dimensions !== undefined || updateDto.shippingCost !== undefined;
 
     if (isEditingIntakeFields) {
       this.assertWarehouseAuthority(parcel, currentUser, 'origin');
     }
-    
+
     if (updateDto.customerTrackingId !== undefined) {
       parcel.customerTrackingId = updateDto.customerTrackingId;
     }
     if (updateDto.weight !== undefined) parcel.weight = updateDto.weight;
+    if (updateDto.description !== undefined) parcel.description = updateDto.description;
     if (updateDto.dimensions !== undefined) parcel.dimensions = updateDto.dimensions;
     if (updateDto.shippingCost !== undefined) parcel.shippingCost = updateDto.shippingCost;
 
@@ -441,7 +421,7 @@ async scanAndReceiveParcel(trackingNumber: string, companyId: string, currentUse
       this.eventEmitter.emit('parcel.status_changed', {
         trackingId: parcel.originalTrackingNumber,
         status: parcel.status,
-        email: parcel.customer.email 
+        email: parcel.customer.email
       });
 
       await this.historyRepository.save(
@@ -460,16 +440,15 @@ async scanAndReceiveParcel(trackingNumber: string, companyId: string, currentUse
   async uploadImage(id: string, file: Express.Multer.File, companyId: string, currentUser: any): Promise<string> {
     const parcel = await this.findOne(id, companyId, currentUser);
 
-    // "Upload images" origin warehouse ka kaam hai (intake ke waqt)
     this.assertWarehouseAuthority(parcel, currentUser, 'origin');
-    
+
     const fileName = await this.storageService.uploadFile(file, `parcels/${companyId}`);
 
     try {
       const currentImages = parcel.imageUrls || [];
       parcel.imageUrls = [...currentImages, fileName];
       await this.parcelRepository.save(parcel);
-      
+
       return await this.storageService.getFileUrl(fileName);
     } catch (error) {
       await this.storageService.deleteFile(fileName);

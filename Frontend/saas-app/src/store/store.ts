@@ -5,6 +5,7 @@ import warehousesReducer from '../features/warehouses/warehousesSlice';
 import staffReducer from '../features/staff/staffSlice';
 import customersReducer from '../features/customers/customersSlice';
 import parcelsReducer from '../features/parcels/parcelsSlice';
+import plansReducer from '../features/plans/plansSlice'; 
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +15,8 @@ export const store = configureStore({
     staff: staffReducer,
     customers: customersReducer,
     parcels: parcelsReducer, 
+    plans: plansReducer,
+
   },
 });
 

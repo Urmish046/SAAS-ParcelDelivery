@@ -31,7 +31,7 @@ export class UsersService {
     }
 
     const newUser = this.userRepository.create({
-      name: createUserDto.name, // Ye line add ki gayi hai
+      name: createUserDto.name,
       email: createUserDto.email,
       password: hashedPassword,
       role: createUserDto.role,

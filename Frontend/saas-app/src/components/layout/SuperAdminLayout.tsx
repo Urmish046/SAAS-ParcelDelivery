@@ -8,7 +8,6 @@ const SuperAdminLayout: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  // 🔥 Mobile menu toggle state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
@@ -18,8 +17,7 @@ const SuperAdminLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen font-sans bg-brand-100 text-brand-900 overflow-hidden">
-      
-      {/* 🔥 Mobile Overlay Backdrop */}
+
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 z-40 bg-brand-900/40 backdrop-blur-sm md:hidden transition-opacity"
@@ -27,7 +25,6 @@ const SuperAdminLayout: React.FC = () => {
         />
       )}
 
-      {/* Sidebar - RESPONSIVE FIX */}
       <aside 
         className={`fixed inset-y-0 left-0 z-50 flex flex-col w-64 text-white shadow-2xl bg-brand-900 shadow-brand-900/50 transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
@@ -40,7 +37,6 @@ const SuperAdminLayout: React.FC = () => {
             </h1>
             <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs tracking-widest uppercase text-brand-300 truncate">Super Admin Panel</p>
           </div>
-          {/* Close button for mobile */}
           <button 
             onClick={() => setIsMobileMenuOpen(false)}
             className="md:hidden p-1 text-brand-300 hover:text-white transition-colors"
@@ -84,13 +80,10 @@ const SuperAdminLayout: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content - RESPONSIVE FIX */}
       <main className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        
-        {/* Header */}
+
         <header className="flex justify-between items-center px-4 sm:px-8 py-4 sm:py-5 bg-white border-b shadow-sm border-brand-300 shrink-0 h-16 sm:h-auto">
           <div className="flex items-center gap-3">
-            {/* Hamburger button for mobile */}
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
               className="md:hidden p-2 -ml-2 text-brand-900 hover:bg-brand-50 rounded-md transition-colors"
@@ -106,12 +99,11 @@ const SuperAdminLayout: React.FC = () => {
             <span className="text-brand-500 truncate max-w-[120px] sm:max-w-none">System Administrator</span>
           </div>
         </header>
-        
-        {/* Scrollable Content Area */}
+
         <div className="flex-1 p-4 sm:p-8 overflow-auto">
           <Outlet />
         </div>
-        
+
       </main>
     </div>
   );

@@ -59,7 +59,6 @@ export class Parcel {
   @JoinColumn({ name: 'companyId' })
   company!: Company;
 
-  // Jahan parcel receive/scan/weigh/price hota hai
   @Column({ nullable: true })
   originWarehouseId!: string;
 
@@ -67,7 +66,6 @@ export class Parcel {
   @JoinColumn({ name: 'originWarehouseId' })
   originWarehouse!: Warehouse;
 
-  // Jahan parcel deliver/pickup/payment collect hota hai
   @Column({ nullable: true })
   destinationWarehouseId!: string;
 

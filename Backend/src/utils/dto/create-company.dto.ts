@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, MinLength, Matches, IsEmail } from 'class-validator';
+import { IsString, IsNotEmpty, MinLength, Matches, IsEmail, IsOptional } from 'class-validator';
 
 export class CreateCompanyDto {
   @IsString()
@@ -25,4 +25,8 @@ export class CreateCompanyDto {
   @IsNotEmpty({ message: 'Admin password is required.' })
   @MinLength(6, { message: 'Password must be at least 6 characters long.' })
   password!: string;
+
+  @IsString()
+  @IsOptional()
+  planId?: string;
 }

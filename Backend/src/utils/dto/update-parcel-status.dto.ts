@@ -18,6 +18,10 @@ export class UpdateParcelStatusDto {
   dimensions?: string;
 
   @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
   @IsNumber()
   shippingCost?: number;
 }

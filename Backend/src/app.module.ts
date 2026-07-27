@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { CacheModule } from '@nestjs/cache-manager';
+import { redisStore } from 'cache-manager-redis-yet';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CompanyModule } from './modules/company/company.module';
@@ -16,11 +18,24 @@ import { StatsModule } from './stats/stats.module';
 import { EmailModule } from './email/email.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { NotificationService } from './modules/notifications/notification.service';
+import { PlanModule } from './modules/plan/plan.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    CacheModule.registerAsync({
+      isGlobal: true,
+      useFactory: async () => ({
+        store: await redisStore({
+          socket: {
+            host: 'localhost',
+            port: 6379,
+          },
+          ttl: 15 * 1000, 
+        }),
+      }),
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -44,6 +59,7 @@ import { NotificationService } from './modules/notifications/notification.servic
     ParcelModule,
     StatsModule,
     EmailModule,
+    PlanModule,
     EventEmitterModule.forRoot(), 
   ],
   controllers: [AppController],

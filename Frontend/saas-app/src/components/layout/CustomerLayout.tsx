@@ -9,8 +9,7 @@ const CustomerLayout: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((state: RootState) => state.auth);
-  
-  // 🔥 Mobile menu toggle state
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
@@ -25,8 +24,7 @@ const CustomerLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen font-sans bg-gray-100 text-brand-900 overflow-hidden">
-      
-      {/* 🔥 Mobile Overlay Backdrop */}
+
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 z-40 bg-brand-900/40 backdrop-blur-sm md:hidden transition-opacity"
@@ -34,7 +32,6 @@ const CustomerLayout: React.FC = () => {
         />
       )}
 
-      {/* Sidebar - RESPONSIVE FIX */}
       <aside 
         className={`fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-white border-r border-gray-200 shadow-sm transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
@@ -44,7 +41,6 @@ const CustomerLayout: React.FC = () => {
           <h1 className="text-xl font-extrabold tracking-widest uppercase text-brand-900 truncate">
             My<span className="text-brand-500">Parcels</span>
           </h1>
-          {/* Close button for mobile */}
           <button 
             onClick={() => setIsMobileMenuOpen(false)}
             className="md:hidden p-1 text-gray-500 hover:text-brand-900 transition-colors"
@@ -77,13 +73,10 @@ const CustomerLayout: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content - RESPONSIVE FIX */}
       <main className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        
-        {/* Header */}
+
         <header className="flex items-center justify-between px-4 sm:px-8 py-4 sm:py-5 bg-white border-b border-gray-200 shadow-sm shrink-0 h-16 sm:h-auto">
           <div className="flex items-center gap-3">
-            {/* Hamburger button for mobile */}
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
               className="md:hidden p-2 -ml-2 text-brand-900 hover:bg-gray-50 rounded-md transition-colors"
@@ -99,8 +92,7 @@ const CustomerLayout: React.FC = () => {
             Welcome, <span className="text-brand-500">{(user as any)?.name || 'Customer'}</span>
           </div>
         </header>
-        
-        {/* Scrollable Content Area */}
+
         <div className="flex-1 p-4 sm:p-8 overflow-auto">
           <Outlet />
         </div>
