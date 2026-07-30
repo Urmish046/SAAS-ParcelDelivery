@@ -35,8 +35,12 @@ export class CustomerService {
     return result;
   }
 
-  async findAll(companyId: string) {
-    const customers = await this.customerRepository.find({ where: { companyId } });
+async findAll(companyId: string) {
+    const customers = await this.customerRepository.find({ 
+      where: { companyId },
+      relations: ['destinationWarehouse']
+    });
+    
     return customers.map(customer => {
       const { password, ...result } = customer;
       return result;
@@ -44,10 +48,15 @@ export class CustomerService {
   }
 
   async findOne(id: string, companyId: string) {
-    const customer = await this.customerRepository.findOne({ where: { id, companyId } });
+    const customer = await this.customerRepository.findOne({ 
+      where: { id, companyId },
+      relations: ['destinationWarehouse']
+    });
+    
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
+    
     const { password, ...result } = customer;
     return result;
   }

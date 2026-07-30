@@ -18,6 +18,7 @@ import MyParcels from '../pages/customer/MyParcels';
 import CustomerLoginPage from '../pages/auth/CustomerLoginPage';
 import CustomerLayout from '../components/layout/CustomerLayout';
 import CustomerDashboard from '../pages/customer/CustomerDashboard';
+import { PricingManagement } from '../pages/admin/PricingManagement';
 
 const AppRoutes: React.FC = () => {
   return (
@@ -40,6 +41,7 @@ const AppRoutes: React.FC = () => {
           <Route path="staff" element={<StaffManagement />} />
           <Route path="customers" element={<CustomersManagement />} />          
           <Route path="parcels" element={<ParcelsManagement />} />
+          <Route path="pricing" element={<PricingManagement />} />
         </Route>
         
         <Route path="/super-admin/login" element={<SuperAdminLoginPage />} />

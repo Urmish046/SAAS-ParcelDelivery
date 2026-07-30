@@ -20,6 +20,7 @@ export interface Parcel {
   destinationWarehouse?: { id: string; name: string }; 
   paymentReceiptUrl?: string;
   isCustomerConfirmed?: boolean;
+  isPaid: boolean;
 }
 
 interface ParcelsState {
@@ -46,19 +47,22 @@ export const fetchParcels = createAsyncThunk(
   }
 );
 
+interface ScanBarcodePayload {
+  trackingNumber: string;
+  customerId?: string;
+}
+
 export const scanBarcode = createAsyncThunk(
   'parcels/scanBarcode',
-  async (trackingNumber: string, { rejectWithValue }) => {
+  async ({ trackingNumber, customerId }: ScanBarcodePayload, { rejectWithValue }) => {
     try {
-      const response = await api.post('/parcels/scan', { trackingNumber });
+      const response = await api.post('/parcels/scan', { trackingNumber, customerId });
       return response.data;
     } catch (error: any) {
-      const msg = error.response?.data?.message;
-      return rejectWithValue(Array.isArray(msg) ? msg.join(' | ') : (msg || 'Failed to scan parcel'));
+      return rejectWithValue(error.response?.data?.message || 'Failed to scan parcel');
     }
   }
 );
-
 export const createPreAlert = createAsyncThunk(
   'parcels/createPreAlert',
   async (trackingNumber: string, { rejectWithValue }) => {

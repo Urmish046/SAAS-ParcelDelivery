@@ -4,7 +4,6 @@ import { Repository, In } from 'typeorm';
 import { Parcel, ParcelStatus } from '../../models/parcel.model';
 import { ParcelStatusHistory } from '../../models/parcel-status-history.model';
 import { UpdateParcelStatusDto } from '../../utils/dto/update-parcel-status.dto';
-import { STORAGE_SERVICE, type IStorageService } from '../../storage/storage.interface';
 import { EmailService } from '../../email/email.service';
 import { PricingService } from '../../pricing/pricing.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -50,38 +49,13 @@ export class ParcelService {
     private trackingRequestRepo: Repository<TrackingRequest>,
     @InjectRepository(Customer)
     private customerRepo: Repository<Customer>,
-    @Inject(STORAGE_SERVICE)
-    private readonly storageService: IStorageService,
     private readonly emailService: EmailService,
     private readonly pricingService: PricingService,
     private eventEmitter: EventEmitter2,
   ) {}
 
   private async formatParcelWithSecureUrls(parcel: Parcel) {
-    const parcelPayload = { ...parcel };
-
-    if (parcelPayload.imageUrls && parcelPayload.imageUrls.length > 0) {
-      parcelPayload.imageUrls = await Promise.all(
-        parcelPayload.imageUrls.map(async (img) => {
-          if (img.startsWith('http')) return img;
-          try {
-            return await this.storageService.getFileUrl(img);
-          } catch (error) {
-            return img;
-          }
-        })
-      );
-    }
-
-    if (parcelPayload.paymentReceiptUrl && !parcelPayload.paymentReceiptUrl.startsWith('http')) {
-      try {
-        parcelPayload.paymentReceiptUrl = await this.storageService.getFileUrl(parcelPayload.paymentReceiptUrl);
-      } catch (error) {
-        console.error('Error generating receipt URL:', error);
-      }
-    }
-
-    return parcelPayload;
+    return { ...parcel };
   }
 
   private assertWarehouseAuthority(parcel: Parcel, currentUser: any, requiredRole: WarehouseRole) {
@@ -100,38 +74,6 @@ export class ParcelService {
       );
     }
   }
-
-  async createPreAlert(trackingNumber: string, companyId: string, currentUser: any) {
-    if (currentUser.role !== 'customer') {
-      throw new ForbiddenException('Only customers can register tracking numbers.');
-    }
-
-    const existingRequest = await this.trackingRequestRepo.findOne({
-      where: { trackingNumber, companyId }
-    });
-
-    if (existingRequest) {
-      throw new ConflictException('This tracking number is already registered in the system.');
-    }
-
-    const customer = await this.customerRepo.findOne({
-      where: { id: currentUser.userId, companyId }
-    });
-
-    if (!customer || !customer.destinationWarehouseId) {
-      throw new BadRequestException('Your profile is missing a default destination warehouse. Please contact support.');
-    }
-
-    const newRequest = this.trackingRequestRepo.create({
-      trackingNumber,
-      companyId,
-      customerId: currentUser.userId,
-      destinationWarehouseId: customer.destinationWarehouseId,
-    });
-
-    return await this.trackingRequestRepo.save(newRequest);
-  }
-
   async getCustomerStats(companyId: string, userId: string) {
     const activeShipments = await this.parcelRepository.count({
       where: {
@@ -160,29 +102,24 @@ export class ParcelService {
     return { activeShipments, actionRequired, readyForPickup };
   }
 
-  async uploadPaymentReceipt(id: string, file: Express.Multer.File, companyId: string, currentUser: any) {
+  async uploadPaymentReceipt(id: string, fileUrl: string, companyId: string, currentUser: any) {
     const parcel = await this.findOne(id, companyId, currentUser);
 
-    const fileName = await this.storageService.uploadFile(file, `payments/${companyId}`);
+    if (!parcel.isCustomerConfirmed) {
+      throw new BadRequestException('You must confirm the shipment & price details before uploading payment receipt.');
+    }
+
+    if (!parcel.shippingCost || parcel.shippingCost <= 0) {
+      throw new BadRequestException('No payable shipping cost found for this parcel.');
+    }
 
     parcel.status = ParcelStatus.PAYMENT_UNDER_REVIEW;
-    parcel.paymentReceiptUrl = fileName;
+    parcel.paymentReceiptUrl = fileUrl;
 
     await this.parcelRepository.save(parcel);
-
-    await this.historyRepository.save(
-      this.historyRepository.create({
-        parcelId: parcel.id,
-        status: ParcelStatus.PAYMENT_UNDER_REVIEW,
-        changedById: currentUser.userId,
-        changedByType: 'customer',
-      })
-    );
-
-    return { receiptUrl: fileName, status: ParcelStatus.PAYMENT_UNDER_REVIEW };
   }
 
-  async scanAndReceiveParcel(trackingNumber: string, companyId: string, currentUser: any) {
+  async scanAndReceiveParcel(trackingNumber: string, customerId: string, companyId: string, currentUser: any) {
     if (currentUser.role !== 'warehouse_staff' || !currentUser.warehouseId) {
       throw new ForbiddenException('Only assigned warehouse staff can scan and receive parcels.');
     }
@@ -196,19 +133,21 @@ export class ParcelService {
       return await this.formatParcelWithSecureUrls(existingParcel);
     }
 
-    const trackingRequest = await this.trackingRequestRepo.findOne({
-      where: { trackingNumber, companyId }
+    const customer = await this.customerRepo.findOne({
+      where: { id: customerId, companyId }
     });
 
-    if (!trackingRequest) {
-      throw new NotFoundException(
-        `Tracking ID "${trackingNumber}" not found! Customer has not registered this parcel.`
-      );
+    if (!customer) {
+      throw new NotFoundException('Selected customer not found in the system.');
     }
 
-    if (currentUser.warehouseId === trackingRequest.destinationWarehouseId) {
+    if (!customer.destinationWarehouseId) {
+      throw new BadRequestException('The selected customer does not have a Default Destination Warehouse set by Admin.');
+    }
+
+    if (currentUser.warehouseId === customer.destinationWarehouseId) {
       throw new BadRequestException(
-        'Origin and Destination warehouses cannot be exactly the same! This warehouse is already set as the destination.'
+        'Origin and Destination warehouses cannot be exactly the same! This warehouse is already the final destination.'
       );
     }
 
@@ -219,8 +158,8 @@ export class ParcelService {
       companyId,
       description: 'Waiting for details update',
       originWarehouseId: currentUser.warehouseId,
-      customerId: trackingRequest.customerId,
-      destinationWarehouseId: trackingRequest.destinationWarehouseId,
+      customerId: customer.id,
+      destinationWarehouseId: customer.destinationWarehouseId,
       status: ParcelStatus.SCANNED,
     });
 
@@ -235,9 +174,6 @@ export class ParcelService {
       })
     );
 
-    trackingRequest.status = TrackingRequestStatus.MATCHED;
-    await this.trackingRequestRepo.save(trackingRequest);
-
     const completeParcel = await this.parcelRepository.findOne({
       where: { id: savedParcel.id },
       relations: ['originWarehouse', 'destinationWarehouse', 'customer'],
@@ -246,40 +182,17 @@ export class ParcelService {
     return await this.formatParcelWithSecureUrls(completeParcel!);
   }
 
-  async claimParcel(trackingId: string, companyId: string, user: any) {
-    const parcel = await this.parcelRepository.findOne({
-      where: {
-        internalTrackingId: trackingId,
-        companyId: companyId
-      }
+  async findByAnyTrackingIdPublic(trackingId: string) {
+    return this.parcelRepository.findOne({
+      where: [
+        { originalTrackingNumber: trackingId },
+        { customerTrackingId: trackingId },
+        { internalTrackingId: trackingId },
+      ],
+      relations: ['originWarehouse', 'destinationWarehouse'],
     });
-
-    if (!parcel) {
-      throw new BadRequestException('Invalid Tracking ID. Parcel not found.');
-    }
-
-    if (parcel.customerId) {
-      if (parcel.customerId === user.userId) {
-        return await this.formatParcelWithSecureUrls(parcel);
-      }
-      throw new BadRequestException('This parcel has already been claimed by another user.');
-    }
-
-    parcel.customerId = user.userId;
-    const savedParcel = await this.parcelRepository.save(parcel);
-
-    await this.historyRepository.save(
-      this.historyRepository.create({
-        parcelId: savedParcel.id,
-        status: savedParcel.status,
-        changedById: user.userId,
-        changedByType: 'customer',
-      })
-    );
-
-    return await this.formatParcelWithSecureUrls(savedParcel);
   }
-
+ 
   async findAll(companyId: string, currentUser: any) {
     if (currentUser.role === 'customer') {
       const parcels = await this.parcelRepository.find({
@@ -354,6 +267,12 @@ export class ParcelService {
       throw new BadRequestException('Parcel cannot be confirmed yet.');
     }
 
+    if (!parcel.weight || !parcel.shippingCost || parcel.shippingCost <= 0) {
+      throw new BadRequestException(
+        'Cannot confirm shipment because weight or shipping cost has not been set by warehouse staff yet.'
+      );
+    }
+
     parcel.isCustomerConfirmed = true;
     await this.parcelRepository.save(parcel);
 
@@ -368,7 +287,6 @@ export class ParcelService {
 
     return await this.formatParcelWithSecureUrls(parcel);
   }
-
   async updateStatus(id: string, updateDto: UpdateParcelStatusDto, companyId: string, currentUser: any) {
     const parcel = await this.findOne(id, companyId, currentUser);
 
@@ -407,14 +325,28 @@ export class ParcelService {
       this.assertWarehouseAuthority(parcel, currentUser, 'origin');
     }
 
-    if (updateDto.customerTrackingId !== undefined) {
+   if (updateDto.customerTrackingId !== undefined) {
       parcel.customerTrackingId = updateDto.customerTrackingId;
     }
-    if (updateDto.weight !== undefined) parcel.weight = updateDto.weight;
+
+    if (updateDto.weight !== undefined) {
+      parcel.weight = updateDto.weight;
+      parcel.shippingCost = await this.pricingService.calculateCost(companyId, updateDto.weight);
+    } 
+    else if (updateDto.shippingCost !== undefined) {
+      parcel.shippingCost = updateDto.shippingCost;
+    }
+
     if (updateDto.description !== undefined) parcel.description = updateDto.description;
     if (updateDto.dimensions !== undefined) parcel.dimensions = updateDto.dimensions;
-    if (updateDto.shippingCost !== undefined) parcel.shippingCost = updateDto.shippingCost;
 
+    if (
+      originalStatus === ParcelStatus.PAYMENT_UNDER_REVIEW && 
+      updateDto.status === ParcelStatus.AVAILABLE_FOR_PICKUP && 
+      (updateDto as any).isPaid === false
+    ) {
+      parcel.paymentReceiptUrl = '';
+    }
     await this.parcelRepository.save(parcel);
 
     if (updateDto.status && originalStatus !== updateDto.status) {
@@ -437,21 +369,18 @@ export class ParcelService {
     return await this.formatParcelWithSecureUrls(parcel);
   }
 
-  async uploadImage(id: string, file: Express.Multer.File, companyId: string, currentUser: any): Promise<string> {
+  async uploadImage(id: string, fileUrl: string, companyId: string, currentUser: any): Promise<string> {
     const parcel = await this.findOne(id, companyId, currentUser);
 
     this.assertWarehouseAuthority(parcel, currentUser, 'origin');
 
-    const fileName = await this.storageService.uploadFile(file, `parcels/${companyId}`);
-
     try {
       const currentImages = parcel.imageUrls || [];
-      parcel.imageUrls = [...currentImages, fileName];
+      parcel.imageUrls = [...currentImages, fileUrl];
       await this.parcelRepository.save(parcel);
 
-      return await this.storageService.getFileUrl(fileName);
+      return fileUrl;
     } catch (error) {
-      await this.storageService.deleteFile(fileName);
       throw new InternalServerErrorException('Database update failed');
     }
   }

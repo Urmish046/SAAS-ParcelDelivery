@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../../features/auth/authSlice';
-import { LayoutDashboard, Building2, Users, Package, LogOut, UserCog, Menu, X } from 'lucide-react';
-import type { RootState } from '../../store/store';
+import { LayoutDashboard, Building2, Users, Package, LogOut, UserCog, Menu, X, DollarSign } from 'lucide-react';import type { RootState } from '../../store/store';
 
 const CompanyAdminLayout: React.FC = () => {
   const dispatch = useDispatch();
@@ -31,12 +30,13 @@ const CompanyAdminLayout: React.FC = () => {
     }
   }
 
-  const menuItems = [
+ const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', exact: true, roles: ['company_admin'] },
     { path: '/dashboard/warehouses', icon: Building2, label: 'Warehouses', roles: ['company_admin'] },
     { path: '/dashboard/staff', icon: UserCog, label: 'Staff', roles: ['company_admin'] },
     { path: '/dashboard/customers', icon: Users, label: 'Customers', roles: ['company_admin'] },
     { path: '/dashboard/parcels', icon: Package, label: 'Parcels', roles: ['company_admin', 'warehouse_staff'] },
+    { path: '/dashboard/pricing', icon: DollarSign, label: 'Pricing', roles: ['company_admin'] },
   ];
 
   const filteredMenu = menuItems.filter(item => item.roles.includes(currentRole || ''));

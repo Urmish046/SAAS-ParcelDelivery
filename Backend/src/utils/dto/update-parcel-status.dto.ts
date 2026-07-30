@@ -1,10 +1,15 @@
-import { IsEnum, IsOptional, IsString, IsNumber } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsNumber, IsBoolean } from 'class-validator';
 import { ParcelStatus } from '../../models/parcel.model';
 
 export class UpdateParcelStatusDto {
   @IsEnum(ParcelStatus)
   status!: ParcelStatus;
 
+  @IsOptional()
+  @IsBoolean()
+  isPaid?: boolean;
+
+  
   @IsOptional()
   @IsString()
   customerTrackingId?: string;

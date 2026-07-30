@@ -1,10 +1,12 @@
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { Company } from './company.model';
+import { IsOptional } from 'class-validator';
 
 @Entity('plans')
 export class Plan {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
+
 
   @Column()
   name!: string; 

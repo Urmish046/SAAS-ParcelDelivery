@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchStaff, createStaff, deleteStaff } from '../../features/staff/staffSlice';
+import { fetchStaff, createStaff, deleteStaff, updateStaff } from '../../features/staff/staffSlice';
 import { fetchWarehouses } from '../../features/warehouses/warehousesSlice';
 import type { AppDispatch, RootState } from '../../store/store';
 
@@ -10,6 +10,7 @@ const StaffManagement: React.FC = () => {
   const { warehouses } = useSelector((state: RootState) => state.warehouses);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,16 +23,39 @@ const StaffManagement: React.FC = () => {
     dispatch(fetchWarehouses());
   }, [status, dispatch]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setName('');
+    setEmail('');
+    setPassword('');
+    setWarehouseId('');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name && email && password && warehouseId) {
-      await dispatch(createStaff({ name, email, password, warehouseId }));
-      setIsModalOpen(false);
-      setName('');
-      setEmail('');
-      setPassword('');
-      setWarehouseId('');
+    if (name && email && warehouseId) {
+      if (editingId) {
+        const updateData: any = { id: editingId, name, email, warehouseId };
+        if (password) updateData.password = password; 
+        await dispatch(updateStaff(updateData));
+      } else {
+        await dispatch(createStaff({ name, email, password, warehouseId }));
+      }
+      
+      dispatch(fetchStaff());
+      
+      handleCloseModal();
     }
+  };
+
+  const handleEdit = (staff: any) => {
+    setEditingId(staff.id);
+    setName(staff.name);
+    setEmail(staff.email);
+    setPassword('');
+    setWarehouseId(staff.warehouse?.id || '');
+    setIsModalOpen(true);
   };
 
   const handleDelete = (id: string) => {
@@ -49,7 +73,7 @@ const StaffManagement: React.FC = () => {
           <p className="text-sm text-gray-500 mt-1">Manage warehouse staff members</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => { handleCloseModal(); setIsModalOpen(true); }}
           className="px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 bg-brand-500 rounded-lg shadow-sm hover:bg-brand-900 hover:shadow-md active:scale-95"
         >
           + Add Staff
@@ -88,18 +112,24 @@ const StaffManagement: React.FC = () => {
                 <tr key={staff.id} className="transition-colors hover:bg-brand-100/20">
                   <td className="px-6 py-4 text-sm font-medium text-brand-900">{staff.name}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">{staff.email}</td>
-                 <td className="px-6 py-4 text-sm">
-  {staff.warehouse?.name ? (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-100 text-brand-900">
-      {staff.warehouse.name}
-    </span>
-  ) : (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-      Unassigned
-    </span>
-  )}
-</td>
-                  <td className="px-6 py-4 text-sm font-medium text-right">
+                  <td className="px-6 py-4 text-sm">
+                    {staff.warehouse?.name ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-100 text-brand-900">
+                        {staff.warehouse.name}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                        Unassigned
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-medium text-right space-x-3">
+                    <button
+                      onClick={() => handleEdit(staff)}
+                      className="text-blue-600 hover:text-blue-800 transition-colors font-medium px-2 py-1 rounded hover:bg-blue-50"
+                    >
+                      Edit
+                    </button>
                     <button
                       onClick={() => handleDelete(staff.id)}
                       className="text-red-500 hover:text-red-700 transition-colors font-medium px-2 py-1 rounded hover:bg-red-50"
@@ -117,8 +147,10 @@ const StaffManagement: React.FC = () => {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 backdrop-blur-sm transition-opacity">
           <div className="w-full max-w-md p-7 bg-white shadow-2xl rounded-2xl border border-brand-100">
-            <h3 className="mb-6 text-xl font-bold text-brand-900">Add New Staff</h3>
-            <form onSubmit={handleCreate} className="space-y-5">
+            <h3 className="mb-6 text-xl font-bold text-brand-900">
+              {editingId ? 'Edit Staff' : 'Add New Staff'}
+            </h3>
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block mb-1.5 text-sm font-medium text-brand-900">Name</label>
                 <input
@@ -140,12 +172,14 @@ const StaffManagement: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block mb-1.5 text-sm font-medium text-brand-900">Password</label>
+                <label className="block mb-1.5 text-sm font-medium text-brand-900">
+                  Password {editingId && <span className="text-gray-400 font-normal text-xs">(Leave blank to keep current)</span>}
+                </label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required
+                  required={!editingId}
                   className="w-full px-4 py-2.5 text-sm transition-colors border rounded-lg border-brand-300 bg-brand-100/30 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 text-brand-900"
                 />
               </div>
@@ -168,7 +202,7 @@ const StaffManagement: React.FC = () => {
               <div className="flex justify-end pt-5 space-x-3 mt-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={handleCloseModal}
                   className="px-5 py-2 text-sm font-medium transition-colors rounded-lg text-brand-900 bg-brand-100 hover:bg-brand-300"
                 >
                   Cancel
@@ -177,7 +211,7 @@ const StaffManagement: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 text-sm font-medium text-white transition-colors rounded-lg bg-brand-500 hover:bg-brand-900 shadow-sm"
                 >
-                  Save Staff
+                  {editingId ? 'Update Staff' : 'Save Staff'}
                 </button>
               </div>
             </form>

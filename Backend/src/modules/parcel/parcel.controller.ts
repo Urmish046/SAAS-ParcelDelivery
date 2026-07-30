@@ -1,5 +1,8 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Injectable, ExecutionContext } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { ParcelService } from './parcel.service';
 import { UpdateParcelStatusDto } from '../../utils/dto/update-parcel-status.dto';
 import { Roles } from '../../decorators/roles.decorator';
@@ -12,40 +15,45 @@ import { RolesGuard } from '../../guards/roles.guard';
 export class ParcelController {
   constructor(private readonly parcelService: ParcelService) {}
 
-  @Post('pre-alert')
-  @Roles('customer')
-  createPreAlert(
-    @Body('trackingNumber') trackingNumber: string,
-    @CurrentUser() user: any
-  ) {
-    if (!trackingNumber) {
-      throw new BadRequestException('Tracking number is required.');
-    }
-    return this.parcelService.createPreAlert(trackingNumber, user.companyId, user);
-  }
-
   @Post('scan')
-  @Roles('warehouse_staff', 'company_admin') 
+  @Roles('warehouse_staff', 'company_admin')
   async scanBarcode(
-    @Body('trackingNumber') trackingNumber: string, 
+    @Body('trackingNumber') trackingNumber: string,
+    @Body('customerId') customerId: string,
     @CurrentUser() user: any
   ) {
     if (!trackingNumber) {
       throw new BadRequestException('Tracking number is required for scanning.');
     }
-    return this.parcelService.scanAndReceiveParcel(trackingNumber, user.companyId, user);
+    if (!customerId) {
+      throw new BadRequestException('Customer selection is required for new parcels.');
+    }
+    return this.parcelService.scanAndReceiveParcel(trackingNumber, customerId, user.companyId, user);
   }
 
   @Post(':id/upload-payment')
   @Roles('customer')
-  @UseInterceptors(FileInterceptor('receipt'))
+  @UseInterceptors(
+    FileInterceptor('receipt', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, callback) => {
+          const uniqueName = `${uuidv4()}${extname(file.originalname)}`;
+          callback(null, uniqueName);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
   async uploadPayment(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: any,
   ) {
     if (!file) throw new BadRequestException('No receipt provided');
-    return this.parcelService.uploadPaymentReceipt(id, file, user.companyId, user);
+
+    const fileUrl = `/uploads/${file.filename}`;
+    return this.parcelService.uploadPaymentReceipt(id, fileUrl, user.companyId, user);
   }
 
   @Get('customer/stats')
@@ -92,9 +100,16 @@ export class ParcelController {
   @Roles('company_admin', 'warehouse_staff')
   @UseInterceptors(
     FileInterceptor('image', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, callback) => {
+          const uniqueName = `${uuidv4()}${extname(file.originalname)}`;
+          callback(null, uniqueName);
+        },
+      }),
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (req, file, callback) => {
-        if (!file.mimetype.match(/\/(jpg|jpeg|png|webp)$/)) {
+        if (!file.mimetype.match(/\/(jpg|jpeg|png|webp|pdf)$/)) {
           return callback(new BadRequestException('Invalid file type'), false);
         }
         callback(null, true);
@@ -107,8 +122,11 @@ export class ParcelController {
     @CurrentUser() user: any,
   ) {
     if (!file) throw new BadRequestException('No image provided');
-    const fileName = await this.parcelService.uploadImage(id, file, user.companyId, user);
-    return { fileName };
+
+    const fileUrl = `/uploads/${file.filename}`;
+    await this.parcelService.uploadImage(id, fileUrl, user.companyId, user);
+
+    return { fileName: fileUrl };
   }
 
   @Delete(':id')

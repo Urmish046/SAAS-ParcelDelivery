@@ -1,17 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import api from '../../api/axiosConfig';
-import { fetchParcels, createPreAlert } from '../../features/parcels/parcelsSlice';
+import { fetchParcels } from '../../features/parcels/parcelsSlice';
+import { useUi } from '../../context/UiContext';
 
 const CustomerDashboard: React.FC = () => {
   const [stats, setStats] = useState({ activeShipments: 0, actionRequired: 0, readyForPickup: 0 });
-  
   const [initialLoading, setInitialLoading] = useState(true);
-
-  const [trackingNumber, setTrackingNumber] = useState('');
-  const [claiming, setClaiming] = useState(false);
-  const [claimMsg, setClaimMsg] = useState({ type: '', text: '' });
-  const [searchedId, setSearchedId] = useState('');
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
@@ -23,6 +18,8 @@ const CustomerDashboard: React.FC = () => {
 
   const dispatch = useDispatch<any>();
   const { parcelsList } = useSelector((state: any) => state.parcels);
+  
+  const { showToast, showConfirm } = useUi();
 
   const fetchAllData = async () => {
     try {
@@ -53,67 +50,17 @@ const CustomerDashboard: React.FC = () => {
     !['completed', 'returned'].includes(p.status.toLowerCase())
   );
 
-  const displayedParcels = searchedId 
-    ? activeParcels.filter((p: any) => 
-        p.originalTrackingNumber === searchedId || 
-        p.customerTrackingId === searchedId || 
-        p.internalTrackingId === searchedId
-      )
-    : [];
-
-  const handleClaim = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const searchTarget = trackingNumber.trim();
-
-    const alreadyExists = parcelsList.find((p: any) => 
-      p.originalTrackingNumber === searchTarget || 
-      p.customerTrackingId === searchTarget || 
-      p.internalTrackingId === searchTarget
-    );
-
-    if (alreadyExists) {
-      const pStatus = alreadyExists.status.toLowerCase();
-      if (['completed', 'returned'].includes(pStatus)) {
-        setClaimMsg({ type: 'error', text: 'This tracking ID is already in your History.' });
-        setSearchedId('');
-      } else {
-        setClaimMsg({ type: 'success', text: 'Tracking ID already exists in your Active Shipments!' });
-        setSearchedId(searchTarget);
+  const handleConfirmShipment = (parcelId: string) => {
+    showConfirm("Are you sure you want to confirm this shipment for dispatch?", async () => {
+      try {
+        await api.patch(`/parcels/${parcelId}/confirm`);
+        fetchAllData();
+        showToast("Shipment confirmed successfully!", "success");
+      } catch (error) {
+        console.error("Failed to confirm shipment", error);
+        showToast("Failed to confirm shipment. Please try again.", "error");
       }
-      return;
-    }
-
-    setClaiming(true);
-    setClaimMsg({ type: '', text: '' });
-
-    try {
-      await dispatch(createPreAlert(searchTarget)).unwrap();
-      
-      setClaimMsg({ type: 'success', text: 'Tracking ID added successfully! Awaiting warehouse scan.' });
-      setSearchedId(searchTarget);
-      setTrackingNumber('');
-      
-      fetchAllData();
-    } catch (error: any) {
-      setClaimMsg({
-        type: 'error',
-        text: error?.message || error || 'Failed to add Tracking ID.' 
-      });
-      setSearchedId('');
-    } finally {
-      setClaiming(false);
-    }
-  };
-
-  const handleConfirmShipment = async (parcelId: string) => {
-    if (!window.confirm("Are you sure you want to confirm this shipment for dispatch?")) return;
-    try {
-      await api.patch(`/parcels/${parcelId}/confirm`);
-      fetchAllData();
-    } catch (error) {
-      console.error("Failed to confirm shipment", error);
-      alert("Failed to confirm shipment. Please try again.");
-    }
+    });
   };
 
   const handleOpenPaymentModal = (parcelId: string) => {
@@ -131,7 +78,7 @@ const CustomerDashboard: React.FC = () => {
   const handleUploadPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!paymentParcelId || !receiptFile) {
-      alert("Please select a receipt file to upload.");
+      showToast("Please select a receipt file to upload.", "error");
       return;
     }
 
@@ -144,14 +91,14 @@ const CustomerDashboard: React.FC = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      alert("Payment receipt uploaded successfully! Your parcel is now Completed.");
+      showToast("Payment receipt uploaded successfully! Your parcel is now under review.", "success");
       setIsPaymentModalOpen(false);
       setPaymentParcelId(null);
       setReceiptFile(null);
       fetchAllData();
     } catch (err: any) {
       console.error("Payment Upload Error:", err);
-      alert(`Failed to upload payment: ${err.response?.data?.message || err.message}`);
+      showToast(`Failed to upload payment: ${err.response?.data?.message || err.message}`, "error");
     } finally {
       setIsUploadingPayment(false);
     }
@@ -174,8 +121,9 @@ const CustomerDashboard: React.FC = () => {
 
   const getFullImageUrl = (url: string) => {
     if (url.startsWith('http')) return url;
-    const cleanUrl = url.startsWith('/') ? url.slice(1) : url;
-    return `http://localhost:9000/${cleanUrl}`;
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${cleanUrl}`;
   };
 
   const handleViewImage = (parcel: any) => {
@@ -206,39 +154,6 @@ const CustomerDashboard: React.FC = () => {
         <p className="text-xs md:text-sm font-medium text-gray-500">
           Track your shipments and pending actions at a glance. Updates automatically.
         </p>
-      </div>
-
-      <div className="mb-10 p-6 bg-white rounded-xl border border-gray-200 shadow-sm">
-        <h3 className="text-sm font-bold text-brand-900 uppercase tracking-wide mb-3">
-          Track a New Parcel
-        </h3>
-        <p className="text-xs text-gray-500 mb-4">
-          Enter the tracking ID given by the warehouse to link it to your account.
-        </p>
-
-        {claimMsg.text && (
-          <div className={`p-3 mb-4 text-xs font-bold uppercase tracking-wider text-white rounded ${claimMsg.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
-            {claimMsg.text}
-          </div>
-        )}
-
-        <form onSubmit={handleClaim} className="flex flex-col sm:flex-row gap-3">
-          <input
-            type="text"
-            value={trackingNumber}
-            onChange={(e) => setTrackingNumber(e.target.value)}
-            placeholder="e.g. PK1234567890"
-            required
-            className="flex-1 px-4 py-3 bg-gray-50 border border-gray-300 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors text-brand-900 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={claiming}
-            className="px-6 py-3 text-sm font-bold tracking-widest text-white uppercase transition-colors bg-brand-900 hover:bg-brand-500 disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            {claiming ? 'Linking...' : 'Add'}
-          </button>
-        </form>
       </div>
 
       <div className="mb-12 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -272,9 +187,12 @@ const CustomerDashboard: React.FC = () => {
         </table>
       </div>
 
-      {displayedParcels.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-brand-900 mb-4">Searched Shipment</h2>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-brand-900">My Active Shipments</h2>
+        </div>
+        
+        {activeParcels.length > 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -288,7 +206,7 @@ const CustomerDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {displayedParcels.map((parcel: any) => (
+                  {activeParcels.map((parcel: any) => (
                     <tr key={parcel.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-bold text-brand-900">{parcel.originalTrackingNumber || parcel.customerTrackingId || 'N/A'}</div>
@@ -303,7 +221,7 @@ const CustomerDashboard: React.FC = () => {
                             onClick={() => handleViewImage(parcel)}
                             className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-600 hover:text-brand-900 transition-colors bg-brand-50 hover:bg-brand-100 px-2 py-1 rounded-md border border-brand-200"
                           >
-                            <span></span> View Image
+                            View Image
                           </button>
                         )}
                       </td>
@@ -332,14 +250,20 @@ const CustomerDashboard: React.FC = () => {
                           </div>
                         )}
 
-                        {parcel.status.toLowerCase() === 'available_for_pickup' && (
-                          <button
-                            onClick={() => handleOpenPaymentModal(parcel.id)}
-                            className="px-4 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow-sm transition-all"
-                          >
-                            Pay Now
-                          </button>
-                        )}
+  {parcel.status.toLowerCase() === 'available_for_pickup' && !parcel.paymentReceiptUrl && (
+    <button
+      onClick={() => handleOpenPaymentModal(parcel.id)}
+      className="px-4 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow-sm transition-all"
+    >
+      Pay Now
+    </button>
+  )}
+
+  {parcel.status.toLowerCase() === 'available_for_pickup' && parcel.paymentReceiptUrl && (
+    <span className="px-3 py-1.5 text-[11px] font-bold text-teal-700 bg-teal-50 border border-teal-200 rounded-lg shadow-sm text-right cursor-default">
+      Payment Cleared. Awaiting Pickup.
+    </span>
+  )}
 
                         {!['scanned', 'available_for_pickup'].includes(parcel.status.toLowerCase()) && (
                           <span className="text-xs font-medium text-gray-400 italic cursor-default">
@@ -353,8 +277,12 @@ const CustomerDashboard: React.FC = () => {
               </table>
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center">
+            <p className="text-gray-500 font-medium">You don't have any active shipments at the moment.</p>
+          </div>
+        )}
+      </div>
 
       {selectedImage && (
         <div
@@ -416,11 +344,26 @@ const CustomerDashboard: React.FC = () => {
                 </svg>
               </button>
             </div>
-
             <form onSubmit={handleUploadPayment} className="space-y-5">
+              
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
+                <h4 className="font-bold text-brand-900 mb-2 border-b border-gray-200 pb-1">Bank Transfer</h4>
+                <div className="space-y-1 mb-4">
+                  <p><span className="font-semibold">Bank Name:</span> Meezan Bank</p>
+                  <p><span className="font-semibold">Account Title:</span> Company Name (Pvt) Ltd</p>
+                  <p><span className="font-semibold">Account No:</span> 01234567890</p>
+                </div>
+
+                <h4 className="font-bold text-brand-900 mb-2 border-b border-gray-200 pb-1">Mobile Wallets</h4>
+                <div className="space-y-1">
+                  <p><span className="font-semibold">JazzCash:</span> 0300-1234567 (Account Name)</p>
+                  <p><span className="font-semibold">EasyPaisa:</span> 0345-1234567 (Account Name)</p>
+                </div>
+              </div>
+
               <div className="p-4 bg-brand-50 rounded-lg border border-brand-200">
                 <p className="text-sm text-brand-800 mb-3 font-medium">
-                  Please upload a screenshot or PDF of your payment transaction.
+                  After transferring the amount to one of the accounts above, please upload a screenshot or PDF of your transaction receipt.
                 </p>
                 <label className="block mb-1.5 text-xs font-bold text-brand-900 uppercase">
                   Select Receipt File

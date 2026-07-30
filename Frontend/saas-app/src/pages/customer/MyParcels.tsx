@@ -54,7 +54,7 @@ const MyParcels: React.FC = () => {
 
   const handleConfirmShipment = async (parcelId: string) => {
     if (!window.confirm("Are you sure you want to confirm this shipment for dispatch?")) return;
-
+    
     try {
       await api.patch(`/parcels/${parcelId}/confirm`);
       fetchMyParcels(); 
@@ -91,7 +91,7 @@ const MyParcels: React.FC = () => {
       await api.post(`/parcels/${paymentParcelId}/upload-payment`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-
+      
       alert("Payment receipt uploaded successfully! Your parcel is now Completed.");
       setIsPaymentModalOpen(false);
       setPaymentParcelId(null);

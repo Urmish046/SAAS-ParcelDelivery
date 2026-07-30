@@ -5,6 +5,7 @@ import { fetchCustomers } from '../../features/customers/customersSlice';
 import { fetchWarehouses } from '../../features/warehouses/warehousesSlice';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import type { AppDispatch, RootState } from '../../store/store';
+import { useUi } from '../../context/UiContext'; 
 
 interface Parcel {
   id: string;
@@ -29,13 +30,22 @@ const PARCEL_STATUSES = [
   { value: 'scanned', label: 'Received & Scanned' },
   { value: 'shipped', label: 'Shipped to Destination' },
   { value: 'available_for_pickup', label: 'Ready for Pickup' },
-  { value: 'payment_under_review', label: 'Payment Under Review' },
   { value: 'completed', label: 'Completed / Delivered' },
-  { value: 'returned', label: 'Returned' }
 ];
 
 const ParcelsManagement: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const { showToast, showConfirm } = useUi(); 
+
+  const getFullImageUrl = (url: string | undefined) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url; 
+    
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+    
+    return `${baseUrl}${cleanUrl}`; 
+  };
 
   const { user, token } = useSelector((state: RootState) => state.auth);
   const { parcelsList, status, error } = useSelector((state: RootState) => state.parcels);
@@ -55,6 +65,7 @@ const ParcelsManagement: React.FC = () => {
         console.error('Failed to parse auth token payload', e);
       }
     }
+    
     return { currentRole: role, currentWarehouseId: warehouseId };
   }, [user, token]);
 
@@ -68,19 +79,19 @@ const ParcelsManagement: React.FC = () => {
   const [selectedParcel, setSelectedParcel] = useState<Parcel | null>(null);
   const [newStatus, setNewStatus] = useState('');
   const [customerTrackingId, setCustomerTrackingId] = useState('');
-  const [updateWeight, setUpdateWeight] = useState('');
-  const [updateShippingCost, setUpdateShippingCost] = useState('');
+ const [updateWeight, setUpdateWeight] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateDescription, setUpdateDescription] = useState('');
   const [notificationBanner, setNotificationBanner] = useState<string | null>(null);
+  const [pendingTrackingNumber, setPendingTrackingNumber] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
 
   useEffect(() => {
     if (status === 'idle') dispatch(fetchParcels());
     dispatch(fetchCustomers());
     dispatch(fetchWarehouses());
   }, [status, dispatch]);
-
 
   useEffect(() => {
     const handleFocus = () => dispatch(fetchParcels());
@@ -126,7 +137,7 @@ const ParcelsManagement: React.FC = () => {
     if (!cleanCode) return;
 
     const existingParcel = parcelsList.find(
-      p => p.originalTrackingNumber?.toLowerCase() === cleanCode.toLowerCase() || 
+      p => p.originalTrackingNumber?.toLowerCase() === cleanCode.toLowerCase() ||
            p.customerTrackingId?.toLowerCase() === cleanCode.toLowerCase() ||
            p.internalTrackingId?.toLowerCase() === cleanCode.toLowerCase()
     );
@@ -135,22 +146,20 @@ const ParcelsManagement: React.FC = () => {
       if (canUserUpdateParcel(existingParcel)) {
         handleOpenStatusModal(existingParcel, false);
       } else {
-        alert('This parcel has been shipped. Status updates must be performed by the destination warehouse.');
+        showToast('This parcel has been shipped. Status updates must be performed by the destination warehouse.', 'error');
       }
       setSearchQuery('');
     } else if (currentRole === 'warehouse_staff' || currentRole === 'company_admin') {
-      const resultAction = await dispatch(scanBarcode(cleanCode));
-      
-      if (scanBarcode.fulfilled.match(resultAction)) {
-        dispatch(fetchParcels()); 
-        setNotificationBanner('New parcel arrived and registered at warehouse.');
-        handleOpenStatusModal(resultAction.payload, true);
-        setSearchQuery('');
-      } else {
-        alert(`Error: Tracking ID not found in system or customer requests. Error: ${resultAction.payload}`);
-      }
+      setSelectedParcel(null);              
+      setPendingTrackingNumber(cleanCode);  
+      setSelectedCustomerId('');
+      setNewStatus('scanned');
+      setUpdateDescription('');
+      setUpdateWeight('');
+      setImageFile(null);
+            setIsStatusModalOpen(true);
     } else {
-      alert('Parcel not found in current view.');
+      showToast('Parcel not found in current view.', 'error');
     }
   };
 
@@ -159,6 +168,71 @@ const ParcelsManagement: React.FC = () => {
       e.preventDefault();
       processScannedCode(searchQuery);
     }
+  };
+
+ const handleReceiveNewParcel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingTrackingNumber || !selectedCustomerId) {
+      showToast('Please select a customer.', 'error');
+      return;
+    }
+    setIsUpdating(true);
+
+    const createPayload = {
+      trackingNumber: pendingTrackingNumber,
+      customerId: selectedCustomerId,
+    };
+
+    const resultAction = await dispatch(scanBarcode(createPayload as any));
+
+    if (scanBarcode.fulfilled.match(resultAction)) {
+      const newParcelId = resultAction.payload?.id;
+
+      if (newParcelId) {
+        await dispatch(updateParcelStatus({
+          id: newParcelId,
+          status: newStatus || 'scanned',
+          weight: updateWeight ? parseFloat(updateWeight) : undefined,
+          description: updateDescription,
+        }));
+      }
+      if (imageFile && newParcelId) {
+        const formData = new FormData();
+        formData.append('image', imageFile);
+
+        try {
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+          const response = await fetch(`${apiUrl}/parcels/${newParcelId}/upload-image`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const data = await response.json();
+            showToast(`Parcel received, but image upload failed: ${data.message || 'Failed'}`, 'error');
+          } else {
+            showToast('New parcel with details and image registered successfully!', 'success');
+          }
+        } catch (err) {
+          showToast('Parcel received, but network error occurred during image upload.', 'error');
+        }
+      } else {
+         showToast('New parcel and details registered successfully!', 'success');
+      }
+
+      setIsStatusModalOpen(false);
+      setSelectedParcel(null);
+      setImageFile(null);
+      setSearchQuery('');
+      setPendingTrackingNumber('');
+      setSelectedCustomerId('');
+      setNotificationBanner('New parcel arrived and registered at warehouse.');
+      dispatch(fetchParcels());
+    } else {
+      showToast(`Error: ${resultAction.payload}`, 'error');
+    }
+    setIsUpdating(false);
   };
 
   useEffect(() => {
@@ -188,7 +262,6 @@ const ParcelsManagement: React.FC = () => {
     setNewStatus(isNewlyScanned ? 'scanned' : parcel.status);
     setCustomerTrackingId(parcel.customerTrackingId || '');
     setUpdateWeight(parcel.weight?.toString() || '');
-    setUpdateShippingCost(parcel.shippingCost?.toString() || '');
     setUpdateDescription(isNewlyScanned ? '' : (parcel.description || ''));
     setImageFile(null);
     setIsStatusModalOpen(true);
@@ -196,17 +269,6 @@ const ParcelsManagement: React.FC = () => {
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) setImageFile(e.target.files[0]);
-  };
-
-  const handleWeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newWeight = e.target.value;
-    setUpdateWeight(newWeight);
-    if (newWeight && !isNaN(parseFloat(newWeight))) {
-      const calculatedCost = (parseFloat(newWeight) * 10 + 15).toFixed(2);
-      setUpdateShippingCost(calculatedCost.toString());
-    } else {
-      setUpdateShippingCost('');
-    }
   };
 
   const handleUpdateStatus = async (e: React.FormEvent) => {
@@ -219,10 +281,8 @@ const ParcelsManagement: React.FC = () => {
         status: newStatus,
         customerTrackingId: newStatus === 'shipped' ? customerTrackingId : undefined,
         weight: newStatus === 'scanned' && updateWeight ? parseFloat(updateWeight) : undefined,
-        shippingCost: newStatus === 'scanned' && updateShippingCost ? parseFloat(updateShippingCost) : undefined,
         description: newStatus === 'scanned' ? updateDescription : undefined,
       }));
-
       if (updateParcelStatus.fulfilled.match(resultAction)) {
         if (newStatus === 'scanned' && imageFile) {
           const formData = new FormData();
@@ -238,11 +298,15 @@ const ParcelsManagement: React.FC = () => {
 
             if (!response.ok) {
               const data = await response.json();
-              alert(`Status updated, but image upload failed: ${data.message || 'Failed to upload'}`);
+              showToast(`Status updated, but image upload failed: ${data.message || 'Failed'}`, 'error');
+            } else {
+              showToast('Status and image updated successfully!', 'success');
             }
           } catch (err) {
-            alert('Status updated, but network error occurred during image upload.');
+            showToast('Status updated, but network error occurred during image upload.', 'error');
           }
+        } else {
+           showToast('Status updated successfully!', 'success');
         }
 
         setIsStatusModalOpen(false);
@@ -251,28 +315,42 @@ const ParcelsManagement: React.FC = () => {
         setSearchQuery('');
         dispatch(fetchParcels()); 
       } else {
-        alert(`Error: ${resultAction.payload}`); 
+        showToast(`Error: ${resultAction.payload}`, 'error'); 
       }
       setIsUpdating(false);
     }
   };
 
-  const handleApprovePayment = async (id: string) => {
-    if (window.confirm('Are you sure you want to approve this payment? This will mark the parcel as Completed.')) {
-      await dispatch(updateParcelStatus({ id, status: 'completed' }));
-      dispatch(fetchParcels());
-    }
+ const handleApprovePayment = async (id: string) => {
+    showConfirm('Are you sure you want to approve this payment? The parcel will now wait for customer pickup.', async () => {
+      const resultAction = await dispatch(updateParcelStatus({ id, status: 'available_for_pickup', isPaid: true } as any));
+      
+      if (updateParcelStatus.fulfilled.match(resultAction)) {
+        dispatch(fetchParcels());
+        showToast('Payment approved! Waiting for customer pickup.', 'success');
+      } else {
+        showToast(`Backend Error: ${resultAction.payload}`, 'error');
+      }
+    });
   };
 
   const handleRejectPayment = async (id: string) => {
-    if (window.confirm('Are you sure you want to reject this payment?')) {
-      await dispatch(updateParcelStatus({ id, status: 'available_for_pickup' }));
-      dispatch(fetchParcels());
-    }
+    showConfirm('Are you sure you want to reject this payment?', async () => {
+      const resultAction = await dispatch(updateParcelStatus({ id, status: 'available_for_pickup', isPaid: false } as any));
+      
+      if (updateParcelStatus.fulfilled.match(resultAction)) {
+        dispatch(fetchParcels());
+        showToast('Payment rejected.', 'success');
+      } else {
+        showToast(`Backend Error: ${resultAction.payload}`, 'error');
+      }
+    });
   };
-
-  const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this parcel?')) dispatch(deleteParcel(id));
+   const handleDelete = (id: string) => {
+    showConfirm('Are you sure you want to delete this parcel?', async () => {
+      dispatch(deleteParcel(id));
+      showToast('Parcel deleted successfully!', 'success');
+    });
   };
 
   const filteredParcels = useMemo(() => {
@@ -293,7 +371,6 @@ const ParcelsManagement: React.FC = () => {
     });
   }, [parcelsList, currentRole, currentWarehouseId, searchQuery]);
 
-
   const inboundDestinationParcels = useMemo(() => parcelsList.filter((p) => {
     const destWhId = p.destinationWarehouseId || p.destinationWarehouse?.id;
     return p.status === 'shipped' && destWhId === currentWarehouseId;
@@ -303,7 +380,6 @@ const ParcelsManagement: React.FC = () => {
     const originWhId = p.originWarehouseId || p.originWarehouse?.id;
     return p.status === 'scanned' && originWhId === currentWarehouseId;
   }), [parcelsList, currentWarehouseId]);
-
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 relative">
@@ -482,49 +558,55 @@ const ParcelsManagement: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-right space-x-3">
 
-                      {parcel.status === 'payment_under_review' && (currentRole === 'company_admin' || currentRole === 'warehouse_staff') && (
-                        <>
-                          {parcel.paymentReceiptUrl && (
-                            <a 
-                              href={parcel.paymentReceiptUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                    {parcel.status === 'payment_under_review' && (currentRole === 'company_admin' || currentRole === 'warehouse_staff') && (
+                      <>
+                        {parcel.paymentReceiptUrl && (
+                          <a 
+                            href={getFullImageUrl(parcel.paymentReceiptUrl)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                          >
+                            View Receipt
+                          </a>
+                        )}
+                        <button
+                          onClick={() => handleApprovePayment(parcel.id)}
+                          className="text-green-600 hover:text-green-800 transition-colors font-medium px-2 py-1 rounded hover:bg-green-50"
+                        >
+                          Approve
+                        </button>
+                       <button
+                              onClick={() => handleRejectPayment(parcel.id)}
+                              className="text-red-500 hover:text-red-700 transition-colors font-medium px-2 py-1 rounded hover:bg-red-50"
                             >
-                              View Receipt
-                            </a>
-                          )}
-                          <button
-                            onClick={() => handleApprovePayment(parcel.id)}
-                            className="text-green-600 hover:text-green-800 transition-colors font-medium px-2 py-1 rounded hover:bg-green-50"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleRejectPayment(parcel.id)}
-                            className="text-red-500 hover:text-red-700 transition-colors font-medium px-2 py-1 rounded hover:bg-red-50"
-                          >
-                            Reject
-                          </button>
-                        </>
-                      )}
+                              Reject
+                            </button>
+                          </>
+                        )}
+
+                        {parcel.status === 'available_for_pickup' && parcel.paymentReceiptUrl && (
+                          <span className="px-3 py-1.5 text-[11px] font-bold text-amber-700 bg-amber-50  rounded-lg cursor-default">
+                           Waiting for Customer
+                          </span>
+                        )}
 
                       {isCompleted ? (
                         <span className="text-xs text-gray-400 italic px-2 py-1">
                           No further action needed
                         </span>
-                      ) : isEditable ? (
+                      ) : (isEditable && parcel.status !== 'payment_under_review') ? (
                         <button
                           onClick={() => handleOpenStatusModal(parcel)}
                           className="text-brand-500 hover:text-brand-900 transition-colors font-medium px-2 py-1 rounded hover:bg-brand-100/50"
                         >
                           Update Status
                         </button>
-                      ) : (
+                      ) : (!isEditable && !isCompleted && parcel.status !== 'payment_under_review') ? (
                         <span className="text-xs text-gray-400 italic px-2 py-1 bg-gray-100 rounded cursor-not-allowed" title="Status updates are restricted to the Destination Warehouse after shipment">
                           Managed by Other Warehouse
                         </span>
-                      )}
+                      ) : null}
 
                       {currentRole === 'company_admin' && (
                         <button
@@ -543,17 +625,49 @@ const ParcelsManagement: React.FC = () => {
         </div>
       </div>
 
-      {isStatusModalOpen && selectedParcel && (
+      {isStatusModalOpen && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 backdrop-blur-sm transition-opacity p-4"
           onClick={() => setIsStatusModalOpen(false)}
         >
           <div 
-            className="w-full max-w-md p-7 bg-white shadow-2xl rounded-2xl border border-brand-100"
+            className="w-full max-w-md p-7 bg-white shadow-2xl rounded-2xl border border-brand-100 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="mb-6 text-xl font-bold text-brand-900">Update Status & Details</h3>
-            <form onSubmit={handleUpdateStatus} className="space-y-4">
+            <h3 className="mb-6 text-xl font-bold text-brand-900">
+              {selectedParcel ? 'Update Status & Details' : 'Receive New Parcel'}
+            </h3>
+            
+            <form onSubmit={selectedParcel ? handleUpdateStatus : handleReceiveNewParcel} className="space-y-4">
+              
+              {!selectedParcel && (
+                <div className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200 mb-4">
+                  <div>
+                    <label className="block mb-1.5 text-xs font-bold text-gray-700 uppercase">Scanned Tracking ID</label>
+                    <input
+                      type="text"
+                      value={pendingTrackingNumber}
+                      disabled
+                      className="w-full px-3 py-2 text-sm border rounded-lg border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1.5 text-xs font-bold text-brand-900 uppercase">Select Customer *</label>
+                    <select
+                      value={selectedCustomerId}
+                      onChange={(e) => setSelectedCustomerId(e.target.value)}
+                      required
+                      className="w-full px-3 py-2 text-sm border rounded-lg border-brand-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900"
+                    >
+                      <option value="">-- Select Customer --</option>
+                      {customersList.map((c: any) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block mb-1.5 text-sm font-medium text-brand-900">Parcel Status</label>
                 <select 
@@ -583,29 +697,16 @@ const ParcelsManagement: React.FC = () => {
                       />
                     </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block mb-1.5 text-xs font-bold text-brand-900 uppercase">Actual Weight (kg)</label>
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        value={updateWeight} 
-                        onChange={handleWeightChange} 
-                        required 
-                        className="w-full px-3 py-2 text-sm border rounded-lg border-brand-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-1.5 text-xs font-bold text-brand-900 uppercase">Shipping Cost ($)</label>
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        value={updateShippingCost} 
-                        onChange={(e) => setUpdateShippingCost(e.target.value)} 
-                        required 
-                        className="w-full px-3 py-2 text-sm border rounded-lg border-brand-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900" 
-                      />
-                    </div>
+                  <div>
+                    <label className="block mb-1.5 text-xs font-bold text-brand-900 uppercase">Actual Weight (kg)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={updateWeight} 
+                      onChange={(e) => setUpdateWeight(e.target.value)} 
+                      required 
+                      className="w-full px-3 py-2 text-sm border rounded-lg border-brand-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900" 
+                    />
                   </div>
                   <div>
                     <label className="block mb-1.5 text-xs font-bold text-brand-900 uppercase">Upload Parcel Image</label>
@@ -613,7 +714,7 @@ const ParcelsManagement: React.FC = () => {
                       type="file" 
                       accept="image/jpeg, image/png, image/webp"
                       onChange={handleImageFileChange} 
-                      required 
+                      required={!selectedParcel}
                       className="w-full px-3 py-2 text-sm border rounded-lg border-brand-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-brand-900" 
                     />
                   </div>
@@ -633,7 +734,7 @@ const ParcelsManagement: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex justify-end pt-4 space-x-3 mt-2">
+              <div className="flex justify-end pt-4 space-x-3 mt-2 border-t border-brand-100">
                 <button 
                   type="button" 
                   onClick={() => setIsStatusModalOpen(false)} 
@@ -644,16 +745,17 @@ const ParcelsManagement: React.FC = () => {
                 </button>
                 <button 
                   type="submit" 
-                  className="px-5 py-2 text-sm font-medium text-white rounded-lg bg-brand-500 hover:bg-brand-900 shadow-sm transition-colors duration-200" 
+                  className="px-5 py-2 text-sm font-medium text-white rounded-lg bg-brand-500 hover:bg-brand-900 shadow-sm transition-colors duration-200 flex items-center gap-2" 
                   disabled={isUpdating}
                 >
-                  {isUpdating ? 'Updating...' : 'Save Details'}
+                  {isUpdating ? 'Saving...' : 'Save Details'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
     </div>
   );
 };

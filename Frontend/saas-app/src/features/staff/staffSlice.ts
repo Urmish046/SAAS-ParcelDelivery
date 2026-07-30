@@ -32,7 +32,7 @@ export const fetchStaff = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await api.get('/users');
-const staffOnly = response.data.filter((user: any) => user.role === 'warehouse_staff');
+      const staffOnly = response.data.filter((user: any) => user.role === 'warehouse_staff');
       return staffOnly;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch staff');
@@ -42,7 +42,7 @@ const staffOnly = response.data.filter((user: any) => user.role === 'warehouse_s
 
 export const createStaff = createAsyncThunk(
   'staff/createStaff',
-  async (staffData: { name: string; email: string; password: string; warehouseId: string }, { rejectWithValue }) => {
+  async (staffData: { name: string; email: string; password?: string; warehouseId: string }, { rejectWithValue }) => {
     try {
       const response = await api.post('/users/staff', {
         ...staffData,
@@ -51,6 +51,19 @@ export const createStaff = createAsyncThunk(
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to create staff member');
+    }
+  }
+);
+
+export const updateStaff = createAsyncThunk(
+  'staff/updateStaff',
+  async (staffData: { id: string; name?: string; email?: string; password?: string; warehouseId?: string }, { rejectWithValue }) => {
+    try {
+      const { id, ...updateFields } = staffData;
+      const response = await api.patch(`/users/${id}`, updateFields);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to update staff member');
     }
   }
 );
@@ -91,6 +104,12 @@ const staffSlice = createSlice({
       })
       .addCase(createStaff.fulfilled, (state, action) => {
         state.staffList.push(action.payload);
+      })
+      .addCase(updateStaff.fulfilled, (state, action) => {
+        const index = state.staffList.findIndex(staff => staff.id === action.payload.id);
+        if (index !== -1) {
+          state.staffList[index] = { ...state.staffList[index], ...action.payload };
+        }
       })
       .addCase(deleteStaff.fulfilled, (state, action) => {
         state.staffList = state.staffList.filter(staff => staff.id !== action.payload);
