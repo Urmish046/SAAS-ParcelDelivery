@@ -1,7 +1,19 @@
 import axios from 'axios';
 
+// Dynamically resolve the backend URL:
+// - If accessed via localhost, hit localhost:3000
+// - If accessed via a network IP (e.g. phone testing), hit the same IP on port 3000
+// - Falls back to VITE_API_URL env variable if explicitly set
+const getBaseUrl = (): string => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  const hostname = window.location.hostname;
+  return `http://${hostname}:3000`;
+};
+
 const api = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: getBaseUrl(),
 });
 
 api.interceptors.request.use(

@@ -8,7 +8,14 @@ async function bootstrap() {
   
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || /^http:\/\/[a-z0-9-]+\.localhost:5173$/.test(origin) || origin === 'http://localhost:5173') {
+      const allowedPatterns = [
+        /^http:\/\/[a-z0-9-]+\.localhost:5173$/,
+        /^http:\/\/localhost:5173$/,
+        /^http:\/\/localhost:4173$/,
+        /^http:\/\/(192\.168|10\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1]))\.\d{1,3}\.\d{1,3}:(5173|4173)$/,
+      ];
+
+      if (!origin || allowedPatterns.some((pattern) => pattern.test(origin))) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -29,9 +36,8 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
-SwaggerModule.setup('docs', app, document);
-  await app.listen(3000);
+  SwaggerModule.setup('docs', app, document);
 
-  
+  await app.listen(3000, '0.0.0.0');
 }
 bootstrap();

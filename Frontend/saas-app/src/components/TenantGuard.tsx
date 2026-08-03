@@ -1,13 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/axiosConfig';
 
+const isIpAddress = (hostname: string): boolean => {
+  const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+  return hostname === 'localhost' || ipv4Pattern.test(hostname);
+};
+
 export const TenantGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [tenant, setTenant] = useState<any>(null);
+  const [_tenant, setTenant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     const hostname = window.location.hostname;
+
+    if (isIpAddress(hostname)) {
+      setLoading(false);
+      return;
+    }
+
     const parts = hostname.split('.');
     
     if (parts.length >= 2 && parts[0] !== 'www') {

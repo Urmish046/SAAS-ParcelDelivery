@@ -20,11 +20,6 @@ const MyParcels: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false); 
 
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [paymentParcelId, setPaymentParcelId] = useState<string | null>(null);
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [isUploadingPayment, setIsUploadingPayment] = useState(false);
-
   const fetchMyParcels = async () => {
     try {
       const { data } = await api.get('/parcels/my-parcels');
@@ -52,59 +47,6 @@ const MyParcels: React.FC = () => {
     }
   }, [selectedImage]);
 
-  const handleConfirmShipment = async (parcelId: string) => {
-    if (!window.confirm("Are you sure you want to confirm this shipment for dispatch?")) return;
-    
-    try {
-      await api.patch(`/parcels/${parcelId}/confirm`);
-      fetchMyParcels(); 
-    } catch (error) {
-      console.error("Failed to confirm shipment", error);
-      alert("Failed to confirm shipment. Please try again.");
-    }
-  };
-
-  const handleOpenPaymentModal = (parcelId: string) => {
-    setPaymentParcelId(parcelId);
-    setReceiptFile(null);
-    setIsPaymentModalOpen(true);
-  };
-
-  const handleReceiptFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setReceiptFile(e.target.files[0]);
-    }
-  };
-
-  const handleUploadPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!paymentParcelId || !receiptFile) {
-      alert("Please select a receipt file to upload.");
-      return;
-    }
-
-    setIsUploadingPayment(true);
-    const formData = new FormData();
-    formData.append('receipt', receiptFile); 
-
-    try {
-      await api.post(`/parcels/${paymentParcelId}/upload-payment`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      
-      alert("Payment receipt uploaded successfully! Your parcel is now Completed.");
-      setIsPaymentModalOpen(false);
-      setPaymentParcelId(null);
-      setReceiptFile(null);
-      fetchMyParcels(); 
-    } catch (err: any) {
-      console.error("Payment Upload Error:", err);
-      alert(`Failed to upload payment: ${err.response?.data?.message || err.message}`);
-    } finally {
-      setIsUploadingPayment(false);
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
       case 'pending': 
@@ -127,7 +69,7 @@ const MyParcels: React.FC = () => {
   const getFullImageUrl = (url: string) => {
     if (url.startsWith('http')) return url;
     const cleanUrl = url.startsWith('/') ? url.slice(1) : url;
-    return `http://localhost:9000/${cleanUrl}`;
+    return `http://localhost:3000/${cleanUrl}`;
   };
 
   return (

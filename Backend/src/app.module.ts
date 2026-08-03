@@ -43,7 +43,7 @@ import { PlanModule } from './modules/plan/plan.module';
         }),
       }),
     }),
-    TypeOrmModule.forRootAsync({
+  TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -55,6 +55,9 @@ import { PlanModule } from './modules/plan/plan.module';
         database: configService.get<string>('DB_NAME'),
         autoLoadEntities: true,
         synchronize: true,
+        ssl: {
+          rejectUnauthorized: false, 
+        },
       }),
     }),
     CompanyModule,
