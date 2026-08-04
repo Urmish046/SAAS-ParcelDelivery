@@ -35,7 +35,7 @@ const InstallBanner: React.FC = () => {
   if (!showBanner) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 bg-zinc-900 text-white p-4 rounded-xl shadow-2xl flex items-center justify-between border border-zinc-700 animate-bounce">
+    <div className="fixed bottom-4 left-4 right-4 z-50 bg-zinc-900 text-white p-4 rounded-xl shadow-2xl flex md:hidden items-center justify-between border border-zinc-700">
       <div>
         <h4 className="font-bold text-sm">Install ParcelFlow App</h4>
         <p className="text-xs text-zinc-400">Get a fast app experience on your phone!</p>
