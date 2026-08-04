@@ -33,9 +33,11 @@ import { PlanModule } from './modules/plan/plan.module';
     }),
     CacheModule.registerAsync({
       isGlobal: true,
-      useFactory: async () => ({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
         store: await redisStore({
-          url: process.env.REDIS_URL || 'redis://localhost:6379',
+          url: configService.get<string>('REDIS_URL') || 'redis://localhost:6379',
           ttl: 15 * 1000, 
         }),
       }),
