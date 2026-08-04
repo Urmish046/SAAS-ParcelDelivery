@@ -222,22 +222,22 @@ const LandingPage: React.FC = () => {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="w-full max-w-xl mx-auto"
         >
-          <form onSubmit={handleTrack} className="flex items-center gap-2 bg-white p-0.0 rounded-xl border border-zinc-200 shadow-lg shadow-zinc-200/50 focus-within:border-[#5f8783] transition-all">
-            <input
-              type="text"
-              value={trackId}
-              onChange={(e) => setTrackId(e.target.value)}
-              placeholder="Enter your tracking ID"
-              className="flex-1 px-4 py-3 text-sm md:text-base border-none focus:outline-none focus:ring-0 text-zinc-900 bg-transparent"
-            />
-            <button
-              type="submit"
-              disabled={tracking}
-              className="px-8 py-3.5 text-sm font-bold text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 transition-colors shadow-md disabled:opacity-60 min-w-[80px]"
-            >
-              {tracking ? 'Locating...' : 'Track'}
-            </button>
-          </form>
+          <form onSubmit={handleTrack} className="flex flex-col sm:flex-row items-center gap-2 bg-white p-2 rounded-xl border border-zinc-200 shadow-lg shadow-zinc-200/50 focus-within:border-[#5f8783] transition-all">
+  <input
+    type="text"
+    value={trackId}
+    onChange={(e) => setTrackId(e.target.value)}
+    placeholder="Enter your tracking ID"
+    className="w-full sm:flex-1 px-4 py-3 text-sm md:text-base border-none focus:outline-none focus:ring-0 text-zinc-900 bg-transparent"
+  />
+  <button
+    type="submit"
+    disabled={tracking}
+    className="w-full sm:w-auto px-6 py-3.5 text-sm font-bold text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 transition-colors shadow-md disabled:opacity-60 shrink-0"
+  >
+    {tracking ? 'Locating...' : 'Track'}
+  </button>
+</form>
 
           {trackError && (
             <p className="mt-3 text-sm font-medium text-amber-700">{trackError}</p>
