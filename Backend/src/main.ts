@@ -7,7 +7,21 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
   app.enableCors({
-    origin: true,
+    origin: (origin, callback) => {
+      const allowedPatterns = [
+        /^http:\/\/[a-z0-9-]+\.localhost:5173$/,
+        /^http:\/\/localhost:5173$/,
+        /^http:\/\/localhost:4173$/,
+        /^http:\/\/(192\.168|10\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1]))\.\d{1,3}\.\d{1,3}:(5173|4173)$/,
+        /^https:\/\/.*\.vercel\.app$/, 
+      ];
+
+      if (!origin || allowedPatterns.some((pattern) => pattern.test(origin))) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   });
 
