@@ -35,10 +35,7 @@ import { PlanModule } from './modules/plan/plan.module';
       isGlobal: true,
       useFactory: async () => ({
         store: await redisStore({
-          socket: {
-            host: 'localhost',
-            port: 6379,
-          },
+          url: process.env.REDIS_URL || 'redis://localhost:6379',
           ttl: 15 * 1000, 
         }),
       }),
