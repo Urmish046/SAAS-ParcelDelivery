@@ -6,6 +6,11 @@ const isIpAddress = (hostname: string): boolean => {
   return hostname === 'localhost' || ipv4Pattern.test(hostname);
 };
 
+const isDefaultDeploymentDomain = (hostname: string): boolean => {
+ 
+  return hostname.endsWith('.vercel.app');
+};
+
 export const TenantGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [_tenant, setTenant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -14,7 +19,8 @@ export const TenantGuard: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const hostname = window.location.hostname;
 
-    if (isIpAddress(hostname)) {
+    
+    if (isIpAddress(hostname) || isDefaultDeploymentDomain(hostname)) {
       setLoading(false);
       return;
     }
